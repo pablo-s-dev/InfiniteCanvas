@@ -1,36 +1,65 @@
 {
   "expo": {
-		"name": "InfiniteCanvas",
-		"slug": "InfiniteCanvas",
-		"version": "1.0.1",
-		"orientation": "portrait",
-		"icon": "./assets/icon.png",
-		"userInterfaceStyle": "light",
-		"splash": {
-			"image": "./assets/splash.png",
-			"resizeMode": "contain",
-			"backgroundColor": "#ffffff"
-		},
-		"assetBundlePatterns": ["**/*"],
-		"ios": {
-			"supportsTablet": true
-		},
-		"android": {
-      "versionCode": 2,
-			"adaptiveIcon": {
-				"foregroundImage": "./assets/adaptive-icon.png",
-				"backgroundColor": "#ffffff"
-			},
-			"package": "com.PabloS.InfiniteCanvas"
-		},
-		"web": {
-			"favicon": "./assets/favicon.png"
-		},
-		"extra": {
-			"eas": {
-				"projectId": "025bcd27-795c-4aa9-843a-94ddddd4c675"
-			}
-		},
-		"plugins": [["./plugins/disableForcedDarkModeAndroid.js", {}]]
-	}
+    "name": "Infinite Canvas",
+    "slug": "InfiniteCanvas",
+    "version": "1.1.0-alpha.2",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "versionCode": 4,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.PabloS.InfiniteCanvas"
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png",
+      "build": {
+        "assetBundlePatterns": [
+          "**/*"
+        ],
+        "publicPath": "./"
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "025bcd27-795c-4aa9-843a-94ddddd4c675"
+      }
+    },
+    "plugins": [
+      [
+        "./plugins/disableForcedDarkModeAndroid.js",
+        {}
+      ],
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      ],
+      [
+        "expo-navigation-bar",
+        {
+          "enforceContrast": false
+        }
+      ],
+      "expo-image"
+    ],
+    "experiments": {
+      "baseUrl": "./"
+    }
+  }
 }
