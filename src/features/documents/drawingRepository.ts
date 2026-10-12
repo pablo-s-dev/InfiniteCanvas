@@ -1,8 +1,11 @@
+import { syncBindings } from "../sync/syncBindings";
+import { syncContentHash } from "../sync/syncContent";
 import {
   CanvasDocument,
   CanvasDrawingData,
   CanvasDocumentMetadata,
   createCanvasDocument,
+  isCanvasDocument,
   touchCanvasDocument,
 } from "../canvas/document";
 import { CompositeTag, flattenCompositeTags } from "../tags/tagModel";
@@ -21,6 +24,7 @@ type SaveOptions = {
   sync?: "local" | "remote" | "synced" | "preserve";
   operation?: SyncQueueOperation;
   syncError?: string;
+  preserveQueue?: boolean;
 };
 
 const sortByUpdatedAtDesc = (drawings: DrawingSummary[]) =>
@@ -30,15 +34,50 @@ const sortByUpdatedAtDesc = (drawings: DrawingSummary[]) =>
   );
 
 export class DrawingRepository {
+  private writes: Promise<unknown> = Promise.resolve();
+  private listeners = new Set<(localEdit: boolean) => void>();
+  subscribe(listener: (localEdit: boolean) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
+  private transact<T>(operation: () => Promise<T>): Promise<T> {
+    const task = this.writes.then(operation); this.writes = task.catch(() => undefined); return task;
+  }
+  async update(id: string, change: (current: CanvasDocument) => CanvasDocument | null, options: SaveOptions = {sync: "preserve"}) {
+    return this.transact(async () => { const current = await this.get(id); if (!current) return null;
+      const next = change(current); return next ? this.write(next, options) : current; });
+  }
+  async acceptUpload(snapshot: CanvasDocument, remote: CanvasDocument, guard: () => void = () => {}): Promise<CanvasDocument | null> {
+    return this.transact(async () => {
+      guard(); const current = await this.get(snapshot.metadata.id); guard(); if (!current) return null;
+      const unchanged = syncContentHash(current) === syncContentHash(snapshot);
+      return this.write({...current, metadata: {...current.metadata,
+        driveFileId: remote.metadata.driveFileId, driveRevisionId: remote.metadata.driveRevisionId,
+        syncConflict: false, syncError: undefined}}, {sync: unchanged ? "synced" : "preserve", preserveQueue: true});
+    });
+  }
+
   async list(): Promise<DrawingSummary[]> {
     const drawings = await jsonStorage.get<DrawingSummary[]>(DRAWING_INDEX_KEY);
     return sortByUpdatedAtDesc(
-      (drawings ?? []).filter((drawing) => !drawing.deletedAt),
+      (Array.isArray(drawings) ? drawings : []).filter(
+        (drawing): drawing is DrawingSummary =>
+          Boolean(
+            drawing &&
+              typeof drawing === "object" &&
+              typeof drawing.id === "string" &&
+              typeof drawing.title === "string" &&
+              typeof drawing.createdAt === "string" &&
+              Number.isFinite(Date.parse(drawing.createdAt)) &&
+              typeof drawing.updatedAt === "string" &&
+              Number.isFinite(Date.parse(drawing.updatedAt)) &&
+              Array.isArray(drawing.tags) &&
+              Array.isArray(drawing.flatTags),
+          ),
+      ).filter((drawing) => !drawing.deletedAt),
     );
   }
 
   async get(id: string): Promise<CanvasDocument | null> {
-    return jsonStorage.get<CanvasDocument>(drawingKey(id));
+    const value = await jsonStorage.get<unknown>(drawingKey(id));
+    return isCanvasDocument(value) ? value : null;
   }
 
   async create(
@@ -54,6 +93,10 @@ export class DrawingRepository {
     document: CanvasDocument,
     options: SaveOptions = {},
   ): Promise<CanvasDocument> {
+    return this.transact(() => this.write(document, options));
+  }
+
+  private async write(document: CanvasDocument, options: SaveOptions): Promise<CanvasDocument> {
     const syncMode = options.sync ?? "local";
     const now = new Date().toISOString();
     const nextDocument = touchCanvasDocument(document, {
@@ -78,6 +121,8 @@ export class DrawingRepository {
             : {}),
       },
     });
+    // Transport bookkeeping must not count as an edit to the drawing.
+    if (syncMode !== "local") nextDocument.metadata.updatedAt = document.metadata.updatedAt;
     const index = await this.listIncludingDeleted();
     const existingIndex = index.findIndex(
       (drawing) => drawing.id === nextDocument.metadata.id,
@@ -99,27 +144,27 @@ export class DrawingRepository {
       await drawingSyncQueue.enqueue(
         nextDocument.metadata.id,
         options.operation ?? "upload",
+        (await syncBindings.get(nextDocument.metadata.id))?.accountBinding,
       );
     }
 
-    if (syncMode === "remote" || syncMode === "synced") {
+    if (!options.preserveQueue && (syncMode === "remote" || syncMode === "synced")) {
       await drawingSyncQueue.markSynced(nextDocument.metadata.id);
     }
 
+    for (const listener of this.listeners) listener(syncMode === "local");
     return nextDocument;
   }
 
   async rename(id: string, title: string): Promise<CanvasDocument | null> {
-    const document = await this.get(id);
-    if (!document) return null;
-
-    return this.save(
+    return this.update(id, document =>
       touchCanvasDocument(document, {
         metadata: {
           ...document.metadata,
           title: title.trim() || document.metadata.title,
         },
       }),
+      {sync: "local"},
     );
   }
 
@@ -127,10 +172,7 @@ export class DrawingRepository {
     id: string,
     tags: CompositeTag[],
   ): Promise<CanvasDocument | null> {
-    const document = await this.get(id);
-    if (!document) return null;
-
-    return this.save(
+    return this.update(id, document =>
       touchCanvasDocument(document, {
         metadata: {
           ...document.metadata,
@@ -138,6 +180,7 @@ export class DrawingRepository {
           flatTags: flattenCompositeTags(tags),
         },
       }),
+      {sync: "local"},
     );
   }
 
@@ -200,11 +243,7 @@ export class DrawingRepository {
   }
 
   async markSyncFailed(id: string, message: string): Promise<CanvasDocument | null> {
-    const document = await this.get(id);
-    if (!document) return null;
-
-    return this.save(
-      {
+    return this.update(id, document => ({
         ...document,
         metadata: {
           ...document.metadata,
@@ -212,12 +251,12 @@ export class DrawingRepository {
           syncError: message,
           syncLastAttemptAt: new Date().toISOString(),
         },
-      },
+      }),
       { sync: "preserve" },
     );
   }
 
-  private async listIncludingDeleted(): Promise<DrawingSummary[]> {
+  async listIncludingDeleted(): Promise<DrawingSummary[]> {
     return (await jsonStorage.get<DrawingSummary[]>(DRAWING_INDEX_KEY)) ?? [];
   }
 }

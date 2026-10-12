@@ -4,6 +4,8 @@ export type CompositeTagJson = {
   flatValues?: string[];
 };
 
+export const CUSTOM_TAGS_STORAGE_KEY = "infinite-canvas:custom-tags";
+
 export class CompositeTag {
   name: string;
   value?: CompositeTag[];

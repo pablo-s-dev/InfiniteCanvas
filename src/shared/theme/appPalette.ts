@@ -3,6 +3,7 @@ export type AppThemeMode = "dark" | "light";
 export type AppTheme = {
   mode: AppThemeMode;
   background: string;
+  canvasBackground: string;
   surface: string;
   surfaceRaised: string;
   surfaceSoft: string;
@@ -22,6 +23,7 @@ export const appThemes: Record<AppThemeMode, AppTheme> = {
   dark: {
     mode: "dark",
     background: "#101018",
+    canvasBackground: "#000000",
     surface: "#181827",
     surfaceRaised: "#222238",
     surfaceSoft: "#2d2947",
@@ -39,6 +41,7 @@ export const appThemes: Record<AppThemeMode, AppTheme> = {
   light: {
     mode: "light",
     background: "#fbfaff",
+    canvasBackground: "#f1f2f4",
     surface: "#ffffff",
     surfaceRaised: "#f2efff",
     surfaceSoft: "#ebe7ff",

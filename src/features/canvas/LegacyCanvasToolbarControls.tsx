@@ -1,7 +1,8 @@
 import React from "react";
 import { Pressable } from "react-native";
-import Icon from "@expo/vector-icons/MaterialIcons";
+import { AppIcon } from "../../shared/icons/AppIcon";
 import { canvasToolTheme } from "../../shared/theme/appPalette";
+import { getZIndex } from "../../shared/theme/zIndex";
 
 export interface CollapseBtnProps {
   shouldCollapse: boolean;
@@ -25,14 +26,14 @@ export const CollapseBtn = ({
         borderTopLeftRadius: 10,
         borderTopRightRadius: 10,
         backgroundColor: canvasToolTheme.button,
-        zIndex: 100,
+        zIndex: getZIndex("toolbar-level-2"),
       }}
     >
-      {shouldCollapse ? (
-        <Icon name="expand-more" size={24} color={canvasToolTheme.foreground} />
-      ) : (
-        <Icon name="expand-less" size={24} color={canvasToolTheme.foreground} />
-      )}
+      <AppIcon
+        icon={shouldCollapse ? "mdi:chevron-down" : "mdi:chevron-up"}
+        size={24}
+        color={canvasToolTheme.foreground}
+      />
     </Pressable>
   );
 };

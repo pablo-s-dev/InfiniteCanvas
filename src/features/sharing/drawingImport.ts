@@ -44,7 +44,9 @@ export const parseDrawingImport = (value: unknown): CanvasDocument[] => {
     candidate?.type === "infinitecanvas.bundle" &&
     Array.isArray(candidate.drawings)
   ) {
-    const drawings = candidate.drawings.filter(isCanvasDocument);
+    const drawings = candidate.drawings.filter((drawing) =>
+      isCanvasDocument(drawing),
+    );
     if (drawings.length > 0) return drawings;
     throw new DrawingImportError(
       "empty_bundle",

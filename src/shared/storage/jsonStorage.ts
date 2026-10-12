@@ -7,8 +7,10 @@ type NativeStorage = typeof import("@react-native-async-storage/async-storage").
 let nativeStoragePromise: Promise<NativeStorage> | null = null;
 
 const getNativeStorage = () => {
-  nativeStoragePromise ??= import("@react-native-async-storage/async-storage").then(
-    ({ default: storage }) => storage,
+  // Native storage is needed at startup. A dynamic import creates an extra
+  // Metro network request in development and leaves the library waiting for it.
+  nativeStoragePromise ??= Promise.resolve(
+    (require("@react-native-async-storage/async-storage") as {default: NativeStorage}).default,
   );
   return nativeStoragePromise;
 };
@@ -32,7 +34,13 @@ export const jsonStorage = {
     }
 
     if (!raw) return null;
-    return JSON.parse(raw) as T;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      // Keep the bytes available for recovery, but never let malformed stored
+      // JSON crash the app while a screen is loading.
+      return null;
+    }
   },
 
   async set<T extends JsonValue>(key: string, value: T): Promise<void> {

@@ -1,11 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  CANVAS_DOCUMENT_VERSION,
-  createCanvasDocument,
-  isCanvasDocument,
-  isCanvasDrawingData,
-  touchCanvasDocument,
-} from "./document";
+import { CANVAS_DOCUMENT_VERSION, createCanvasDocument, isCanvasDocument, isCanvasDrawingData, touchCanvasDocument } from "./document";
 import { CompositeTag } from "../tags/tagModel";
 
 describe("canvas document schema", () => {
@@ -52,5 +46,72 @@ describe("canvas document schema", () => {
     expect(isCanvasDocument(document)).toBe(true);
     expect(isCanvasDrawingData({ ...document, version: 1 })).toBe(false);
     expect(isCanvasDocument({ ...document, metadata: undefined })).toBe(false);
+  });
+
+  it("rejects executable path data and unsafe image protocols", () => {
+    const document = createCanvasDocument("Untrusted");
+    const scriptPath = {
+      id: "path-1",
+      type: "path" as const,
+      data: 'M0 0 L1 1 <script>alert(1)</script>',
+      color: "#ffffff",
+      width: 2,
+    };
+    expect(isCanvasDocument({ ...document, items: [scriptPath] })).toBe(false);
+
+    const unsafeImage = {
+      id: "image-1",
+      type: "image" as const,
+      uri: "javascript:alert(1)",
+    };
+    expect(isCanvasDocument({ ...document, items: [unsafeImage] })).toBe(false);
+  });
+
+  it("rejects local-only and SVG data URIs for cloud documents", () => {
+    const document = createCanvasDocument("Untrusted");
+    const localImage = {
+      id: "image-1",
+      type: "image" as const,
+      uri: "file:///data/user/0/app/files/photo.png",
+    };
+    const svgImage = {
+      id: "image-2",
+      type: "image" as const,
+      uri: "data:image/svg+xml;base64,PHN2Zy8+",
+    };
+
+    expect(isCanvasDocument({ ...document, items: [localImage] })).toBe(true);
+    expect(
+      isCanvasDocument({ ...document, items: [localImage] }, { allowLocalImageUris: false }),
+    ).toBe(false);
+    expect(
+      isCanvasDocument({ ...document, items: [svgImage] }, { allowLocalImageUris: false }),
+    ).toBe(false);
+  });
+
+  it("rejects invalid numeric values and unknown document fields", () => {
+    const document = createCanvasDocument("Untrusted");
+    const invalidPath = {
+      id: "path-1",
+      type: "path" as const,
+      data: "M0 0 L1 1",
+      color: "#ffffff",
+      width: Number.POSITIVE_INFINITY,
+    };
+
+    expect(isCanvasDocument({ ...document, items: [invalidPath] })).toBe(false);
+    expect(isCanvasDocument({ ...document, injectedHtml: "<img onerror=alert(1)>" })).toBe(false);
+    expect(
+      isCanvasDocument({
+        ...document,
+        items: [
+          {
+            ...invalidPath,
+            width: 2,
+            color: "rgb(999, 0, 0)",
+          },
+        ],
+      }),
+    ).toBe(false);
   });
 });
