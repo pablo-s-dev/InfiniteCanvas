@@ -1,63 +1,73 @@
-# InfiniteCanvas Architecture
+# Arquitetura do Infinite Canvas
 
-InfiniteCanvas has two app surfaces:
+O projeto usa organização por funcionalidade (feature based). Cada funcionalidade
+mantém seus componentes, regras e hooks próximos. Não usamos todas as camadas de
+Feature-Sliced Design nem pastas vazias apenas para reproduzir esse padrão.
 
-- Standalone app: home/library first, then opens the existing drawing canvas.
-- Embedded app: when loaded inside an iframe, it goes straight to the canvas for Memory Copilot.
+## Entrada e composição
 
-The current drawing implementation still lives in the root `App.tsx`. New canvas behavior should move into feature slices as the app is modularized.
+- `AppEntry.js` registra `src/shell/InfiniteCanvasApp.tsx` no Expo.
+- `shell/InfiniteCanvasApp.tsx` compõe as telas, navegação e fluxos entre elas.
+- `App.tsx` reexporta o editor para manter compatibilidade com imports existentes.
+  A implementação do editor fica em `features/canvas`.
 
-## Feature Slices
+## Responsabilidades
 
-```txt
-src/
-  shell/
-  features/
-    canvas/
-    documents/
-    home/
-    sync/
-    tags/
-  shared/
-    icons/
-    storage/
-```
+| Local | Responsabilidade |
+| --- | --- |
+| `features/canvas/CanvasEditor.tsx` | Conectar o controlador à cena visual |
+| `features/canvas/hooks/useCanvasController.ts` | Coordenar estado, entrada de ponteiros, viewport e histórico do editor |
+| `features/canvas/hooks/useCanvasSelectionInteractions.ts` | Arrastar e redimensionar seleção; controlar o ciclo da interação |
+| `features/canvas/hooks/useScribbleEraseFreeze.ts` | Controlar a pausa e a tolerância de movimento do scribble |
+| `features/canvas/components/CanvasScene.tsx` | Renderizar o canvas e conectar os eventos aos handlers |
+| `features/canvas/components/` | Barras, seleção visual, menus, imagens e diálogos do editor |
+| `features/canvas/document.ts` | Contrato e validação do documento persistido |
+| `features/canvas/pathGeometry.ts` | Construção, amostragem e medição dos traços |
+| `features/canvas/selectionGeometry.ts` | Interseção dos traços com a seleção |
+| `features/canvas/pathTransforms.ts` | Translação e escala dos traços |
+| `features/canvas/scribbleGesture.ts` | Reconhecimento do rabisco, sem temporizador ou interface |
+| `features/canvas/canvasHistory.ts` | Operações sobre itens e representações do histórico |
+| `features/canvas/canvasTypes.ts` | Tipos internos do editor |
+| `features/canvas/canvasConstants.ts` | Valores configuráveis do editor |
+| `features/documents/` | Repositório e diálogos de criação, detalhes e saída sem salvar |
+| `features/home/` | Biblioteca, seleção de desenhos, filtros, configurações e apresentação dos conflitos |
+| `features/sync/hooks/useCloudSync.ts` | Conexão, entitlement, compra, restauração, fila e resolução de conflitos |
+| `features/sync/components/CloudSyncPaywall.tsx` | Apresentação da compra e de seu estado |
+| `features/sync/googleDriveSync.ts` | Cliente do serviço de sincronização |
+| `features/sharing/` | Importação, exportação, rasterização e compartilhamento |
+| `features/tags/` | Modelo das tags e componentes de edição |
+| `shared/` | Temas, ícones, traduções, armazenamento e recursos de interface reutilizáveis |
+| `platform/` | Integrações específicas de plataforma |
+| `worker/` | Serviço independente de autenticação, compra e acesso ao Drive |
 
-## Embed Boundary
+## Como escolher onde colocar código
 
-Memory Copilot embeds the web build through:
+1. Uma regra que recebe dados e devolve dados deve ficar em um módulo comum de
+   TypeScript. Por exemplo: testar interseção ou reconhecer um scribble.
+2. Estado, temporizadores, efeitos e o ciclo de uma interação ficam em um hook.
+3. Layout e elementos visuais ficam em componentes. Recebem dados e callbacks;
+   não devem executar compra ou acesso ao Drive diretamente.
+4. O shell coordena ações entre telas. Features não importam o shell.
+5. Código só vai para `shared` quando representa uma responsabilidade compartilhada.
+   Uma regra específica de seleção continua no canvas.
+6. Componentes devem ser declarados fora da função de outro componente. Isso
+   mantém sua identidade entre renderizações e evita remontagens de botões.
 
-```txt
-/InfiniteCanvas/index.html
-```
+O controlador do canvas ainda concentra a coordenação entre desenho, ponteiros e
+viewport. Novas extrações devem seguir responsabilidades e contratos explícitos,
+evitando hooks com listas de argumentos sem relação entre si.
 
-The embed contract is `postMessage` based:
+## Exemplo: ajustar scribble to erase
 
-- host sends `INIT`
-- host sends `CONFIG`
-- canvas sends `UPDATES`
+- Mudar o reconhecimento: `scribbleGesture.ts`.
+- Mudar o intervalo ou a tolerância: `canvasConstants.ts`.
+- Mudar o ciclo de pausa/cancelamento: `hooks/useScribbleEraseFreeze.ts`.
+- Mudar como os alvos são apagados do documento: `hooks/useCanvasController.ts`.
 
-See `docs/EMBED_CONTRACT.md` for the full message contract and examples.
+## Glossário
 
-The payload contract is v2 only:
-
-```ts
-{
-  version: 2,
-  items,
-  historyCursor,
-  viewport
-}
-```
-
-`items` is the ordered canvas operation list. Path items carry their own `color` and `width`; image items carry their own `uri` and placement data. `historyCursor` points at the last active item in that ordered list. Local library documents wrap this drawing data with `metadata`; embedded Memory Copilot fields can store the drawing data directly.
-
-## Versioning
-
-App releases follow semantic versioning. The current roadmap implementation starts at:
-
-```txt
-1.1.0-alpha.0
-```
-
-Canvas documents have their own schema version in `CANVAS_DOCUMENT_VERSION`.
+- **Hook:** função React que encapsula estado, efeitos ou comportamento reutilizável.
+- **Entitlement:** direito de acesso confirmado pelo serviço.
+- **Viewport:** posição e zoom da região visível do desenho.
+- **Handler:** função que responde a um evento, como mover ou soltar um ponteiro.
+- **Callback:** função passada a outro componente ou módulo para responder a uma ação.

@@ -1,75 +1,47 @@
-# Google Drive Sync
+# Sincronização com o Google Drive
 
-InfiniteCanvas uses direct Google Drive API storage. There is no owned backend in this architecture.
+## Arquitetura
 
-## Storage Location
+O app salva primeiro no dispositivo. Um controlador compartilhado mantém separados a sessão, o acesso à compra, a autorização do Drive e a operação em andamento. Biblioteca, canvas e tarefa de segundo plano usam o mesmo motor de sincronização.
 
-Drawings are stored in the user's Drive `appDataFolder`.
+O app acessa nosso Worker, que verifica a conta e o acesso em cada operação. Só o Worker acessa o Drive e valida compras no Google Play. Segredos ficam no servidor; tokens individuais do Drive ficam criptografados no D1. No navegador, a sessão usa um cookie HttpOnly e chamadas pela mesma origem em `/api`. No Android, a sessão fica no SecureStore.
 
-That means files are private to InfiniteCanvas and do not appear in the user's normal Drive file browser. Export can later provide visible copies when users want manual access.
+## Conta e arquivos
 
-## Runtime Support
+Os desenhos ficam em `Meu Drive/InfiniteCanvas`. O escopo `drive.file` permite trabalhar com arquivos criados ou explicitamente compartilhados com o app. Arquivos manuais desconhecidos não são importados. A migração copia e valida os desenhos antigos da pasta oculta, preservando os originais.
 
-The Drive REST upload/list/download implementation is shared by web and native
-builds. The only runtime-specific part is acquiring the Google OAuth access
-token.
+Cada vínculo e item da fila pertence a uma conta. Trocar de conta não envia nem apaga os desenhos da conta anterior. A interface permite criar uma cópia para a conta atual explicitamente. Sair revoga a sessão do serviço e preserva os desenhos locais e a autorização do Drive no servidor.
 
-Web uses Google Identity Services. Android uses
-`@react-native-google-signin/google-signin` and then calls the same Drive REST
-methods.
+## Como decidir entre atualizar e resolver conflito
 
-Create a local `.env.local` file before running Drive sync:
+O motor guarda o hash do conteúdo da última versão compartilhada. Câmera, zoom, timestamps e metadados de transporte não fazem parte desse hash.
 
-```txt
-EXPO_PUBLIC_GOOGLE_CLIENT_ID=<google-oauth-client-id>
-```
+| Comparação | Ação |
+| --- | --- |
+| Local e nuvem iguais | Marcar como sincronizado |
+| Apenas local mudou desde a base | Enviar atualização |
+| Apenas nuvem mudou desde a base | Baixar atualização |
+| As duas mudaram e são diferentes | Pedir escolha com previews |
+| Diferentes, sem base conhecida | Pedir escolha sem afirmar edição simultânea |
 
-Use the Web OAuth client ID here. Do not copy Google `client_secret_*.json`
-files into source control. The client secret is not used by this frontend-only
-OAuth flow.
+O servidor verifica a revisão e usa uma escrita condicional no Drive. Resolver conflito aplica a escolha às versões mostradas; se elas mudarem, o usuário precisa revisar novamente. A confirmação de upload preserva qualquer edição feita enquanto a requisição estava em andamento.
 
-Use the fixed development origin `http://localhost:8081` for web OAuth setup.
-The `npm run web` script pins Expo to that port so Google Cloud does not need a
-new authorized JavaScript origin every time the dev server starts.
+## Segurança e recuperação
 
-For Android device sign-in, Google Cloud also needs an Android OAuth client
-registered for:
+Worker e app validam profundamente o documento antes de usá-lo. Arquivos inválidos não substituem a última cópia local válida nem são marcados como sincronizados. Identificadores de arquivos no conteúdo nunca autorizam acesso ou exclusão: o servidor usa os vínculos da conta autenticada.
 
-- package name: `com.PabloS.InfiniteCanvas`
-- SHA-1 fingerprint for the signing key used by the APK being tested
+No Android remoto, cada operação também exige Play Integrity. O acesso comprado é confirmado pelo servidor, não por um booleano local. A liberação de desenvolvimento exige identidade Google real verificada e uma concessão registrada no banco local; não representa compra na Play.
 
-The local APK currently uses the generated Android debug keystore signing
-configuration. A Play Store build will need the Play/App signing SHA-1
-registered separately.
+## Desenvolvimento
 
-## Data Shape
+Veja [configuração do Worker](../worker/README.md). Expo permanece em `http://localhost:8081`; o Worker local usa a porta 8788. Para o Android de desenvolvimento conectado por cabo, configure `EXPO_PUBLIC_CLOUD_SYNC_API_URL=http://127.0.0.1:8788` e encaminhe as portas 8081 e 8788 com `adb reverse` para o dispositivo escolhido.
 
-Each drawing is uploaded as:
+Em produção web, configure a rota `/api/*` na mesma origem para o Worker. Configure o banco e os secrets reais antes de qualquer publicação. Este trabalho não publica em produção.
 
-```txt
-<drawing-id>.infinitecanvas.json
-```
+## Glossário
 
-The JSON payload is the versioned `CanvasDocument` shape from `src/features/canvas/document.ts`.
-
-## Sync Model
-
-The app is local-first:
-
-- drawings save locally immediately;
-- local create/edit/delete operations are persisted into an offline sync queue;
-- sync uploads queued local drawings when signed in;
-- sync deletes queued remote Drive files for locally deleted drawings that had
-  already been uploaded;
-- sync lists and downloads remote drawings from Drive `appDataFolder`;
-- Drive file and revision IDs are stored in drawing metadata;
-- revision conflicts are surfaced in the home UI for user resolution.
-- Android can request a native Google token and refresh cached native tokens
-  once after a Drive `401`.
-- failed queued items keep their error state locally and retry with backoff when
-  the app is open and connected.
-
-Still missing:
-
-- Android APK sign-in/sync smoke testing with a registered OAuth SHA-1.
-- OS-level native background sync while the app is closed.
+- **API:** interface de programação de aplicações.
+- **D1:** banco de dados da Cloudflare.
+- **HttpOnly:** atributo que impede JavaScript de ler o cookie de sessão.
+- **OAuth:** protocolo de autorização utilizado pelo Google.
+- **ADB:** Android Debug Bridge, ferramenta de conexão e depuração do Android.

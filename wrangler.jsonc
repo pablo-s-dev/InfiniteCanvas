@@ -1,0 +1,38 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "infinitecanvas-sync-dev",
+  "main": "worker/src/index.ts",
+  "compatibility_date": "2026-09-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "secrets": {
+    "required": [
+      "GOOGLE_OAUTH_CLIENT_ID",
+      "GOOGLE_OAUTH_CLIENT_SECRET",
+      "TOKEN_ENCRYPTION_KEY",
+      "PLAY_SERVICE_ACCOUNT_JSON",
+      "PLAY_RTDN_OIDC_AUDIENCE",
+      "PLAY_RTDN_SERVICE_ACCOUNT_EMAIL"
+    ]
+  },
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 }
+  },
+  "vars": {
+    "APP_PACKAGE_NAME": "com.PabloS.InfiniteCanvas",
+    "CLOUD_SYNC_PRODUCT_ID": "cloud_sync_unlock",
+    "LOCAL_DEV_MODE": "false",
+    "ALLOWED_WEB_ORIGINS": ""
+  },
+  "triggers": {
+    "crons": ["17 * * * *"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "infinitecanvas-sync-dev",
+      "database_id": "00000000-0000-4000-8000-000000000001",
+      "migrations_dir": "worker/migrations"
+    }
+  ]
+}

@@ -15,6 +15,7 @@ web-build/
 *.p12
 *.key
 *.mobileprovision
+/credentials.json
 
 # Metro
 .metro-health-check*
@@ -30,6 +31,9 @@ yarn-error.*
 
 # local env files
 .env*.local
+.dev.vars
+.dev.vars.*
+.wrangler/
 client_secret_*.json
 google-oauth-client*.json
 
