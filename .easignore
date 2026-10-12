@@ -1,0 +1,67 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+.git/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+/credentials.json
+/winget
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+.dev.vars
+.wrangler/
+worker/
+wrangler.jsonc
+client_secret_*.json
+google-oauth-client*.json
+
+# typescript
+*.tsbuildinfo
+old/
+outputs/
+
+# Codex remote screenshot attachments are unrelated to the app source.
+/InfiniteCanvas/
+
+# Keep Android's local Gradle outputs and debug signing key out of cloud builds.
+/android/.gradle/
+/android/.kotlin/
+/android/build/
+/android/app/build/
+/android/app/.cxx/
+/android/app/debug.keystore
+/android/**/.idea/
+/android/local.properties
+/android/**/*.iml
+/android/**/*.hprof
+/android/**/*.jsbundle
+
+# Workspace-only material that is not needed for the Android build.
+/.agents/
+/.vscode/
+/docs/

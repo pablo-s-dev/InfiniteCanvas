@@ -1,6 +1,6 @@
 {
   "name": "infinitecanvas",
-  "version": "1.1.0-alpha.3",
+  "version": "1.1.0-alpha.7",
   "main": "AppEntry.js",
   "scripts": {
     "start": "expo start",
@@ -12,6 +12,9 @@
     "doctor": "npx expo-doctor",
     "verify": "npm run typecheck && npm run test && npm run doctor",
     "build:web": "expo export --platform web --output-dir dist",
+    "worker:dev": "wrangler dev --local --port 8788",
+    "worker:migrate:local": "wrangler d1 migrations apply infinitecanvas-sync-dev --local",
+    "worker:typecheck": "tsc --noEmit -p worker/tsconfig.json",
     "android:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-android-apk.ps1",
     "android:apk:arm64": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-android-apk.ps1 -Architectures arm64-v8a",
     "android:aab": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-android-aab.ps1"
@@ -27,14 +30,22 @@
     "@react-native-community/slider": "5.2.0",
     "@react-native-google-signin/google-signin": "^16.1.4",
     "expo": "~57.0.25",
+    "expo-background-task": "~57.0.21",
     "expo-blur": "~57.0.3",
     "expo-clipboard": "~57.0.2",
+    "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.1",
     "expo-image": "~57.0.5",
+    "expo-image-manipulator": "~57.0.20",
+    "expo-image-picker": "~57.0.20",
     "expo-navigation-bar": "~57.0.2",
+    "expo-secure-store": "~57.0.4",
+    "expo-sharing": "~57.0.22",
     "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.4",
+    "expo-task-manager": "~57.0.21",
+    "js-sha256": "^1.0.0",
     "nuqs": "^2.8.9",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -59,9 +70,11 @@
     }
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260929.1",
     "@types/react": "~19.2.14",
     "@types/react-native-vector-icons": "^6.4.18",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "wrangler": "^4.143.1"
   }
 }

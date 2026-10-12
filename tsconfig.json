@@ -3,5 +3,6 @@
   "compilerOptions": {
     "strict": true
   },
-  "exclude": ["old", "dist", "node_modules"]
+  "include": ["App.tsx", "src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["old", "dist", "node_modules", "worker", ".wrangler", "android", "outputs", "InfiniteCanvas"]
 }
