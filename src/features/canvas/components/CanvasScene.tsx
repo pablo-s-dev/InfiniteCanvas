@@ -149,7 +149,7 @@ export function CanvasScene({ selectedImageId, selectCanvasImage, updateCanvasIm
             const isPendingErase = pendingEraseItemIds.includes(item.id);
             return (<React.Fragment key={i}>
                   {isSelected && (<Path stroke={canvasToolTheme.accent} d={item.data} fill={"none"} fillOpacity={0} strokeLinecap="round" strokeLinejoin="round" strokeOpacity={0.65} strokeWidth={(item.width + 10) / scale}/>)}
-                  <Path stroke={item.color} d={item.data} fill={"none"} fillOpacity={0} opacity={isPendingErase ? 0.2 : 1} strokeLinecap="round" strokeLinejoin="round" strokeWidth={item.width / scale}/>
+                  <Path stroke={item.color} d={item.data} fill={"none"} fillOpacity={0} opacity={eraserMode && eraserModeType === "stroke" && isPendingErase ? 0.2 : 1} strokeLinecap="round" strokeLinejoin="round" strokeWidth={item.width / scale}/>
                 </React.Fragment>);
         })}
             {selectedBounds && (<Rect x={selectedBounds.minX} y={selectedBounds.minY} width={Math.max(selectedBounds.maxX - selectedBounds.minX, 1)} height={Math.max(selectedBounds.maxY - selectedBounds.minY, 1)} fill="none" stroke={canvasToolTheme.accent} strokeWidth={1.5 / scale} strokeDasharray="10 6" rx={3 / scale}/>)}
