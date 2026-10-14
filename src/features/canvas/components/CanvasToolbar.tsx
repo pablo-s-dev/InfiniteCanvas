@@ -74,7 +74,8 @@ export function InlineSizeSlider({ label, value, onChange, color, minimumValue =
         }}>
           {label}: {Math.round(value)}
         </Text>
-        <View pointerEvents="none" style={{
+        <View style={{
+            pointerEvents: "none",
             alignItems: "center",
             height: 42,
             justifyContent: "center",

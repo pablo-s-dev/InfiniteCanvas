@@ -11,7 +11,7 @@ export function CoordinateHud({ coordinates, scale, showCoordinates = false }: {
   const zoomText = Math.abs(zoomPercent) >= 100000 || Math.abs(zoomPercent) < 0.01
     ? `${zoomPercent.toExponential(2)}%`
     : `${Math.max(0.01, zoomPercent).toFixed(zoomPercent < 10 ? 2 : 0)}%`;
-  return <View pointerEvents="none" style={{ position: "absolute", top: 12, left: 12,
+  return <View style={{ pointerEvents: "none", position: "absolute", top: 12, left: 12,
     zIndex: getZIndex("canvas-level-6"), alignItems: "flex-start", gap: 6 }}>
     <View style={{ backgroundColor: canvasToolTheme.bar, borderRadius: 999,
       paddingHorizontal: 12, paddingVertical: 7 }}>

@@ -45,7 +45,6 @@ export function DrawingPreview({
   return (
     <View
       accessible={false}
-      pointerEvents="none"
       style={[
         styles.container,
         {
@@ -113,6 +112,7 @@ export function DrawingPreview({
 
 const styles = StyleSheet.create({
   container: {
+    pointerEvents: "none",
     borderRadius: 8,
     borderWidth: 1,
     height: 66,

@@ -111,7 +111,6 @@ export function DrawingRasterizer({
   return (
     <View
       collapsable={false}
-      pointerEvents="none"
       style={[styles.offscreen, layoutDimensions]}
     >
       <Svg
@@ -172,6 +171,7 @@ export function DrawingRasterizer({
 
 const styles = StyleSheet.create({
   offscreen: {
+    pointerEvents: "none",
     left: -10000,
     opacity: 0,
     position: "absolute",

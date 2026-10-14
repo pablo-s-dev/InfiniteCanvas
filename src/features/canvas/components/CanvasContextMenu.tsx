@@ -70,10 +70,10 @@ export function CanvasContextMenu({ menu, canPaste, onPaste, onInsertImage, onIn
             borderWidth: 1,
             minWidth: 190,
             padding: 6,
-            shadowColor: "#000",
-            shadowOpacity: 0.28,
-            shadowRadius: 10,
-            shadowOffset: { width: 0, height: 4 },
+            ...(Platform.OS === "web"
+                ? { boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.28)" }
+                : { shadowColor: "#000", shadowOpacity: 0.28,
+                    shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }),
         }}>
         {items.map((item) => (<Pressable key={item.label} {...webTitle(item.label)} accessibilityLabel={item.label} disabled={item.disabled} onPress={item.action} style={{
                 alignItems: "center",

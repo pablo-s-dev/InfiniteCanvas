@@ -33,7 +33,8 @@ export function SelectionOverlay({ bounds, isDragging, isResizing, onPointerDown
         { label: "Duplicate", icon: "copy-plus", action: onDuplicate },
         { label: "Delete", icon: "mdi:delete-outline", action: onDelete },
     ];
-    return (<View pointerEvents="box-none" style={{
+    return (<View style={{
+            pointerEvents: "box-none",
             position: "absolute",
             left: bounds.left,
             top: bounds.top,
@@ -65,10 +66,10 @@ export function SelectionOverlay({ bounds, isDragging, isResizing, onPointerDown
             borderWidth: 1,
             backgroundColor: canvasToolTheme.bar,
             zIndex: getZIndex("canvas-level-4"),
-            shadowColor: "#000",
-            shadowOpacity: 0.28,
-            shadowRadius: 10,
-            shadowOffset: { width: 0, height: 4 },
+            ...(Platform.OS === "web"
+                ? { boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.28)" }
+                : { shadowColor: "#000", shadowOpacity: 0.28,
+                    shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }),
         }}>
         {actions.map((actionItem) => {
             return (<Pressable key={actionItem.label} {...webTitle(actionItem.label)} accessibilityLabel={actionItem.label} onPointerDown={(event) => event.stopPropagation()} onPress={(event) => {

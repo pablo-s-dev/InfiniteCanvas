@@ -1,6 +1,6 @@
 import { useAppTheme } from "../../../shared/theme/ThemeContext";
 import type { AppTheme } from "../../../shared/theme/appPalette";
-import { StyleSheet } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 import { getZIndex } from "../../../shared/theme/zIndex";
 import React from "react";
 import { View, Text, Pressable, Modal } from "react-native";
@@ -63,13 +63,10 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
         backgroundColor: theme.surface,
         padding: 20,
         borderRadius: 12,
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 5,
-        },
-        shadowOpacity: 0.34,
-        shadowRadius: 6.27,
+        ...(Platform.OS === "web"
+            ? { boxShadow: "0px 5px 6.27px rgba(0, 0, 0, 0.34)" }
+            : { shadowColor: "#000", shadowOffset: { width: 0, height: 5 },
+                shadowOpacity: 0.34, shadowRadius: 6.27 }),
         elevation: 10,
     },
     hueContainer: {
@@ -113,13 +110,10 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
         paddingVertical: 10,
         alignSelf: "center",
         backgroundColor: theme.surface,
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
+        ...(Platform.OS === "web"
+            ? { boxShadow: "0px 2px 3.84px rgba(0, 0, 0, 0.25)" }
+            : { shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25, shadowRadius: 3.84 }),
         elevation: 5,
     },
 });

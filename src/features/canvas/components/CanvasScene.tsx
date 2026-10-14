@@ -18,6 +18,7 @@ import type { useCanvasController } from "../hooks/useCanvasController";
 export function CanvasScene({ selectedImageId, selectCanvasImage, updateCanvasImage, insertShapeAtCenter, insertImageAtCenter, canvasBackgroundColor, buttonsContainerColor, curIdx, canvasItems, setCurIdx, windowHeight, canvasCursor, canvasRef, nativeTouchActiveRef, onTouchMoveSvg, onTouchStartSvg, onTouchEndSvg, cancelScribbleFreeze, nativeTwoFingerGestureActiveRef, prevFingersPos, prevTwoFingerDist, setShouldBlockDrawing, eraserMode, cancelEraserGesture, lassoMode, rectangleSelectionMode, finalizeLassoSelection, prepareForNextDrawing, isSelectionResizePointerEvent, selectedPathIndexes, clearSelection, startWebEraserPointer, handleConfiguredPointerStart, handlePointerMoveSvg, handleConfiguredPointerMove, finishWebEraserPointer, handleConfiguredPointerEnd, eraserPointerIdRef, getWebPointerPosition, queueEraserTrailPoint, webCanvasEventProps, onCanvasLayout, svgRef, x, y, scale, svgItems, pendingEraseItemIds, selectedBounds, lassoPath, eraserPreviewPath, eraserPreviewOpacity, strokeColorPreview, curPath, strokeWidth, imgItems, selectionScreenBounds, isSelectionDragging, isSelectionResizing, startSelectionDrag, moveSelectionDrag, endSelectionDrag, startSelectionResize, moveSelectionResize, endSelectionResize, duplicateSelectedPaths, deleteSelectedPaths, canvasContextMenu, pasteSelectionAtContextMenu, insertImageAtContextMenu, insertShapeAtContextMenu, setCanvasContextMenu, pseudoPointerMode, pointerHintVisible, pseudoLeftClick, canvasPointToScreenPoint, pseudoPointerPos, cursorCoordinates, setPseudoLeftClick, onlyPanningMode, setColorPickerModal, activateStrokeMode, activatePanMode, activatePointerMode, activateEraserMode, confirmWipeCanvas, resetViewportToContent, smoothingEnabled, setSmoothingEnabled, shapeTool, activateShapeTool, activateLassoMode, activateRectangleSelectionMode, eraserModeType, setEraserModeType, eraserSize, setEraserSize, setStrokeWidth, setStrokeColor, clearCanvasDialogOpen, setClearCanvasDialogOpen, wipeCanvas, customSwatches, onColorSelect, showColorPickerModal }: ReturnType<typeof useCanvasController>) {
  const canvasToolTheme = useCanvasToolTheme();
  const { theme } = useAppTheme();
+ const viewportTransform = `translate(${x} ${y}) scale(${scale})`;
 
     return (<View 
     // disable scroling through the canvas
@@ -126,7 +127,7 @@ export function CanvasScene({ selectedImageId, selectCanvasImage, updateCanvasIm
             zIndex: getZIndex("canvas-level-3"),
             pointerEvents: "none",
         }}>
-          <G translateX={x} translateY={y} scaleX={scale} scaleY={scale}>
+          <G transform={viewportTransform}>
             {svgItems.map((item, i) => {
             // if (item.type != "path") return;
             if (item.type != "path") {
@@ -154,11 +155,11 @@ export function CanvasScene({ selectedImageId, selectCanvasImage, updateCanvasIm
         })}
             {selectedBounds && (<Rect x={selectedBounds.minX} y={selectedBounds.minY} width={Math.max(selectedBounds.maxX - selectedBounds.minX, 1)} height={Math.max(selectedBounds.maxY - selectedBounds.minY, 1)} fill="none" stroke={canvasToolTheme.accent} strokeWidth={1.5 / scale} strokeDasharray="10 6" rx={3 / scale}/>)}
           </G>
-          <Path stroke={canvasToolTheme.accent} d={lassoPath} fill={"none"} strokeWidth={1.5 / scale} strokeOpacity={0.9} strokeDasharray="8 7" strokeLinecap="round" strokeLinejoin="round" translateX={x} translateY={y} scaleX={scale} scaleY={scale}/>
+          <Path stroke={canvasToolTheme.accent} d={lassoPath} fill={"none"} strokeWidth={1.5 / scale} strokeOpacity={0.9} strokeDasharray="8 7" strokeLinecap="round" strokeLinejoin="round" transform={viewportTransform}/>
           {eraserPreviewPath !== "" && (<Path d={eraserPreviewPath} fill="#ffffff" fillOpacity={eraserPreviewOpacity}/>)}
           <Path stroke={strokeColorPreview} key={curIdx} d={curPath} fill={"none"} strokeWidth={strokeWidth / scale} fillOpacity={0} strokeLinecap="round" strokeLinejoin="round" 
     // scale={scale}
-    translateX={x} translateY={y} scaleX={scale} scaleY={scale}/>
+    transform={viewportTransform}/>
         </Svg>
         {imgItems.map((item, i) => {
             const imgUri = item.uri;
@@ -168,7 +169,8 @@ export function CanvasScene({ selectedImageId, selectCanvasImage, updateCanvasIm
         {canvasContextMenu && (<CanvasContextMenu menu={canvasContextMenu} canPaste={true} onPaste={pasteSelectionAtContextMenu} onInsertImage={insertImageAtContextMenu} onInsertShape={insertShapeAtContextMenu} onClose={() => setCanvasContextMenu(null)}/>)}
       </View>
 
-      {pseudoPointerMode && pointerHintVisible && (<View pointerEvents="none" style={{
+      {pseudoPointerMode && pointerHintVisible && (<View style={{
+                pointerEvents: "none",
                 position: "absolute",
                 top: 54,
                 right: 16,

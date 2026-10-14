@@ -35,7 +35,7 @@ export function DraggableCanvasImage(props: DraggableCanvasImageProps) {
  });
  const drag = useRef(createGesture(false)).current;
  const resize = useRef(createGesture(true)).current;
- return <View pointerEvents={props.interactive ? "auto" : "none"} onTouchStart={event => { if (event.nativeEvent.touches.length === 1) event.stopPropagation(); }} onTouchMove={event => { if (event.nativeEvent.touches.length === 1) event.stopPropagation(); }} onPointerDown={event => event.stopPropagation()} onPointerMove={event => event.stopPropagation()} onPointerUp={event => event.stopPropagation()} {...drag.panHandlers} style={{position: "absolute", left: props.offset[0] + props.x * props.scale, top: props.offset[1] + props.y * props.scale,
+ return <View onTouchStart={event => { if (event.nativeEvent.touches.length === 1) event.stopPropagation(); }} onTouchMove={event => { if (event.nativeEvent.touches.length === 1) event.stopPropagation(); }} onPointerDown={event => event.stopPropagation()} onPointerMove={event => event.stopPropagation()} onPointerUp={event => event.stopPropagation()} {...drag.panHandlers} style={{pointerEvents: props.interactive ? "auto" : "none", position: "absolute", left: props.offset[0] + props.x * props.scale, top: props.offset[1] + props.y * props.scale,
  width: props.width * props.scale, height: props.height * props.scale, zIndex: getZIndex("canvas-level-2"),
  borderWidth: props.selected ? 2 : 0, borderColor: theme.accent} as any}>
  <Image source={{uri: props.uri}} contentFit="contain" draggable={false} pointerEvents="none" style={{width: "100%", height: "100%"}}/>

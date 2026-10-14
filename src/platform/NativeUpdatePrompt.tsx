@@ -385,9 +385,11 @@ const styles = StyleSheet.create({
     elevation: 16,
     maxWidth: 440,
     padding: 24,
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.22,
-    shadowRadius: 28,
+    ...(Platform.OS !== "web" && {
+      shadowOffset: { width: 0, height: 14 },
+      shadowOpacity: 0.22,
+      shadowRadius: 28,
+    }),
     width: "100%",
   },
   title: {
