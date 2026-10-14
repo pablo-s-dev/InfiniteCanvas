@@ -92,57 +92,11 @@ type DriveContext = {
   folderId: string;
 };
 
-type LocalTestEnv = Env & {
-  LOCAL_TEST_ENTITLEMENT_EMAILS?: string;
-};
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 const isLocalWorkerRequest = (request: Request) =>
   ["localhost", "127.0.0.1", "::1"].includes(new URL(request.url).hostname);
-
-function hasLocalTestEntitlement(
-  request: Request,
-  email: string,
-  env: Env,
-): boolean {
-  const normalizedEmail = email.trim().toLowerCase();
-  const allowlist = (env as LocalTestEnv).LOCAL_TEST_ENTITLEMENT_EMAILS ?? "";
-  return (
-    (env.LOCAL_DEV_MODE as string) === "true" &&
-    isLocalWorkerRequest(request) &&
-    allowlist
-      .split(",")
-      .some((entry) => entry.trim().toLowerCase() === normalizedEmail)
-  );
-}
-
-function isAllowedLocalTestEmail(email: string, env: Env): boolean {
-  const allowlist = (env as LocalTestEnv).LOCAL_TEST_ENTITLEMENT_EMAILS ?? "";
-  const normalizedEmail = email.trim().toLowerCase();
-  return allowlist
-    .split(",")
-    .some((entry) => entry.trim().toLowerCase() === normalizedEmail);
-}
-
-async function handleLocalTestSession(
-  request: Request,
-  env: Env,
-): Promise<Response> {
-  if ((env.LOCAL_DEV_MODE as string) !== "true" || !isLocalWorkerRequest(request)) {
-    throw new HttpError(404, "route_not_found", "The requested route was not found.");
-  }
-
-  const body = await readJsonBody(request, 4 * 1024);
-  const email = expectString(body.email, "email", 254).trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !isAllowedLocalTestEmail(email, env)) {
-    throw new HttpError(403, "local_test_account_not_allowed", "This account is not enabled for local Cloud Sync testing.");
-  }
-
-  const session = await createSession(`local-test:${email}`, email, "web", env);
-  return jsonResponse({ email, ...session });
-}
 
 async function verifyIntegrity(
   request: Request,
@@ -204,7 +158,8 @@ async function authenticate(request: Request, env: Env): Promise<Session> {
   )
     .bind(tokenHash, now)
     .first<Session>();
-  if (!session) throw new HttpError(401, "session_expired", "Your Cloud Sync session has expired. Sign in again.");
+  if (!session || session.google_subject.startsWith("local-test:"))
+    throw new HttpError(401, "session_expired", "Your Cloud Sync session has expired. Sign in again.");
 
   const bodyText = await readBoundedText(request.clone().body, MAX_DOCUMENT_BYTES);
   if (session.client_type === "web") {
@@ -459,11 +414,6 @@ async function currentEntitlement(
   env: Env,
 ): Promise<{ active: boolean; status: string; updatedAt?: string; accountBinding: string }> {
   const accountBinding = await createAccountBinding(session.google_subject, env);
-  if (hasLocalTestEntitlement(request, session.email, env)) {
-    const grant = await env.DB.prepare("SELECT google_subject FROM development_grants WHERE google_subject = ?1").bind(session.google_subject).first();
-    if (grant && !session.google_subject.startsWith("local-test:")) return { active: true, status: "active", accountBinding };
-  }
-
   const purchase = await env.DB.prepare(
     `SELECT purchase_token_hash, google_subject, product_id, purchase_state,
             purchase_token_ciphertext, purchase_token_iv, acknowledged,
@@ -656,11 +606,6 @@ async function handleGoogleCodeExchange(
       );
   }
   const session = await createSession(profile.subject, profile.email, clientType, env, credentialWrites);
-  if (hasLocalTestEntitlement(request, profile.email, env)) {
-    await env.DB.prepare(`INSERT INTO development_grants (google_subject, email, reason, created_at)
-      VALUES (?1, ?2, 'explicit-local-test-access', ?3) ON CONFLICT(google_subject) DO NOTHING`)
-      .bind(profile.subject, profile.email, new Date().toISOString()).run();
-  }
   return sessionResponse(request, profile.email, session, clientType);
 }
 
@@ -1440,9 +1385,6 @@ async function routeRequest(request: Request, env: Env): Promise<Response> {
   }
   if (request.method === "POST" && pathname === "/v1/auth/google/exchange") {
     return handleGoogleCodeExchange(request, env);
-  }
-  if (request.method === "POST" && pathname === "/v1/dev/test-session") {
-    return handleLocalTestSession(request, env);
   }
   if (request.method === "POST" && pathname === "/v1/webhooks/google-play") {
     return handleGooglePlayNotification(request, env);
