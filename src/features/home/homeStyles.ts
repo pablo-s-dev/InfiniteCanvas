@@ -1,4 +1,4 @@
-import { StyleSheet } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 import type { AppTheme } from "../../shared/theme/appPalette";
 export const createStyles = (theme: AppTheme) => StyleSheet.create({
     screen: {
@@ -141,9 +141,17 @@ export const createStyles = (theme: AppTheme) => StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 8,
     },
+    tagChipsRow: {
+        alignItems: "center",
+        flexDirection: "row",
+        gap: 8,
+        minWidth: 0,
+        width: "100%",
+    },
     chipScroll: {
-        flexGrow: 0,
+        flex: 1,
         flexShrink: 1,
+        minWidth: 0,
     },
     chipWrap: {
         alignItems: "center",
@@ -207,9 +215,9 @@ export const createStyles = (theme: AppTheme) => StyleSheet.create({
         elevation: 4,
         height: 44,
         justifyContent: "center",
-        shadowColor: "#000",
-        shadowOpacity: 0.2,
-        shadowRadius: 5,
+        ...(Platform.OS === "web"
+            ? { boxShadow: "0px 0px 5px rgba(0, 0, 0, 0.2)" }
+            : { shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 5 }),
         width: 44,
     },
     list: {
@@ -461,6 +469,20 @@ export const createStyles = (theme: AppTheme) => StyleSheet.create({
         flex: 1,
         fontSize: 14,
         fontWeight: "700",
+    },
+    syncSummaryRow: {
+        alignItems: "center",
+        flexDirection: "row",
+        gap: 10,
+        minHeight: 42,
+        paddingVertical: 10,
+    },
+    syncSummaryText: {
+        color: theme.textMuted,
+        flex: 1,
+        fontSize: 14,
+        fontWeight: "700",
+        minWidth: 0,
     },
     primaryButtonWide: {
         alignItems: "center",

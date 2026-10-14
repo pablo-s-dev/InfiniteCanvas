@@ -95,7 +95,7 @@ export function useDialogStyles() {
     dialogNoTags: {
         color: theme.textMuted,
         fontSize: 12,
-        marginBottom: 8,
+        flexShrink: 1,
         paddingHorizontal: 4,
     },
     dialogAddChip: {
@@ -104,6 +104,7 @@ export function useDialogStyles() {
         borderRadius: 999,
         height: 32,
         justifyContent: "center",
+        marginLeft: "auto",
         width: 32,
     },
     dialogActions: {

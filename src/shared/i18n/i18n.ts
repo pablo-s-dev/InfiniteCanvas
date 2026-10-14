@@ -31,7 +31,7 @@ export const detectSystemLanguage = (): SupportedLanguage => {
 const dictionary = {
 
   en: {
-    cloudNetworkUnavailable: "Cannot reach the sync service. Your drawings are saved on this device.",
+    cloudNetworkUnavailable: "Couldn't sync right now. Your drawings are still saved on this device.",
     cloudCheckConflict: "Check sync",
     cloudConnectAccount: "Connect Google account",
     cloudCheckAccess: "Verify access",
@@ -41,14 +41,11 @@ const dictionary = {
     cloudReconnectDrive: "Reconnect Google Drive",
     cloudAccountMismatch: "Use the same Google account. Sign out first to switch accounts.",
     cloudChangedDuringResolution: "A version changed. Review the copies again before choosing.",
-    cloudInvalidDocument: "This drawing has invalid data. Your local copy was preserved.",
-    cloudSyncPartialFailure: "Some drawings could not sync. Review the pending items.",
+    cloudInvalidDocument: "This drawing couldn't be synced. Your local copy is safe.",
+    cloudSyncPartialFailure: "Some drawings could not be synced. Try again.",
     cloudBuyOnAndroid: "Purchase Cloud Sync in the Android app, then verify access here with the same Google account.",
-    cloudUnbasedConflict: "Two different copies of \u201c{title}\u201d were found without a verified common base. Choose which to keep.",
+    cloudUnbasedConflict: "Two different copies of \u201c{title}\u201d were found. Choose which one to keep.",
     cloudReviewAgain: "Review again",
-    cloudPendingItems: "Pending sync items",
-    cloudRetry: "Retry",
-    cloudLocalOnly: "Local copy",
     cloudConfirmSignOut: "Sign out? Your local drawings and Drive files will be kept.",
     cloudCopyToAccount: "Copy to this account",
     cloudOtherAccount: "Linked to another account",
@@ -64,21 +61,11 @@ const dictionary = {
 
     settings: "Settings",
 
-    syncSummarySynced: "Synced",
+    syncSummaryUnsyncedOne: "1 drawing not synced",
 
-    syncSummaryPending: "Pending sync",
+    syncSummaryUnsyncedMany: "{count} drawings not synced",
 
-    syncSummaryAttention: "Needs attention",
-
-    syncDrawingOne: "1 drawing",
-
-    syncDrawingMany: "{count} drawings",
-
-    syncDetails: "Sync details",
-
-    drawingsSaved: "drawings saved",
-
-    synced: "synced",
+    syncSummaryAllSynced: "All drawings are synced",
 
     search: "Search drawings or tags",
 
@@ -344,9 +331,9 @@ const dictionary = {
 
     cloudSyncOneTimePrice: "One-time purchase: {price}. Payment is handled by Google Play.",
 
-    cloudSyncLockedStatus: "Cloud Sync is locked on this device.",
+    cloudSyncLockedStatus: "Cloud Sync isn't available for this account.",
 
-    cloudSyncProductUnavailable: "The purchase is not available yet. Try again later.",
+    cloudSyncProductUnavailable: "Cloud Sync can't be purchased right now.",
 
     cloudSyncPurchasePending:
 
@@ -369,7 +356,7 @@ const dictionary = {
   },
 
   pt: {
-    cloudNetworkUnavailable: "Sem conex\u00e3o com o servi\u00e7o de sincroniza\u00e7\u00e3o. Seus desenhos est\u00e3o salvos neste dispositivo.",
+    cloudNetworkUnavailable: "N\u00e3o foi poss\u00edvel sincronizar agora. Seus desenhos continuam salvos neste dispositivo.",
     cloudCheckConflict: "Conferir sync",
     cloudConnectAccount: "Conectar conta Google",
     cloudCheckAccess: "Verificar acesso",
@@ -379,14 +366,11 @@ const dictionary = {
     cloudReconnectDrive: "Reconectar Google Drive",
     cloudAccountMismatch: "Use a mesma conta Google. Saia primeiro para trocar de conta.",
     cloudChangedDuringResolution: "Uma vers\u00e3o mudou. Confira as c\u00f3pias novamente antes de escolher.",
-    cloudInvalidDocument: "Este desenho cont\u00e9m dados inv\u00e1lidos. Sua c\u00f3pia local foi preservada.",
-    cloudSyncPartialFailure: "Alguns desenhos n\u00e3o puderam sincronizar. Confira os itens pendentes.",
+    cloudInvalidDocument: "N\u00e3o foi poss\u00edvel sincronizar este desenho. Sua c\u00f3pia local foi preservada.",
+    cloudSyncPartialFailure: "Alguns desenhos n\u00e3o foram sincronizados. Tente novamente.",
     cloudBuyOnAndroid: "Compre o Cloud Sync no app Android e depois verifique o acesso aqui com a mesma conta Google.",
-    cloudUnbasedConflict: "Foram encontradas duas c\u00f3pias diferentes de \u201c{title}\u201d, sem uma base comum verificada. Escolha qual manter.",
+    cloudUnbasedConflict: "Encontramos duas vers\u00f5es diferentes de \u201c{title}\u201d. Escolha qual manter.",
     cloudReviewAgain: "Conferir novamente",
-    cloudPendingItems: "Itens pendentes de sincroniza\u00e7\u00e3o",
-    cloudRetry: "Tentar novamente",
-    cloudLocalOnly: "C\u00f3pia local",
     cloudConfirmSignOut: "Sair da conta? Os desenhos locais e os arquivos no Drive ser\u00e3o mantidos.",
     cloudCopyToAccount: "Copiar para esta conta",
     cloudOtherAccount: "Vinculado a outra conta",
@@ -402,21 +386,11 @@ const dictionary = {
 
     settings: "Ajustes",
 
-    syncSummarySynced: "Sincronizado",
+    syncSummaryUnsyncedOne: "1 desenho não sincronizado",
 
-    syncSummaryPending: "Pendente de sincronização",
+    syncSummaryUnsyncedMany: "{count} desenhos não sincronizados",
 
-    syncSummaryAttention: "Precisa de atenção",
-
-    syncDrawingOne: "1 desenho",
-
-    syncDrawingMany: "{count} desenhos",
-
-    syncDetails: "Detalhes da sincronização",
-
-    drawingsSaved: "desenhos salvos",
-
-    synced: "sincronizados",
+    syncSummaryAllSynced: "Todos os desenhos estão sincronizados",
 
     search: "Buscar desenhos ou tags",
 
@@ -688,11 +662,11 @@ const dictionary = {
 
     cloudSyncOneTimePrice: "Compra única: {price}. O pagamento é feito pela Google Play.",
 
-    cloudSyncLockedStatus: "A sincronização na nuvem está bloqueada neste dispositivo.",
+    cloudSyncLockedStatus: "A sincronização na nuvem não está disponível para esta conta.",
 
     cloudSyncProductUnavailable:
 
-      "A compra ainda não está disponível. Tente novamente mais tarde.",
+      "Não é possível comprar a sincronização na nuvem no momento.",
 
     cloudSyncPurchasePending:
 
@@ -715,7 +689,7 @@ const dictionary = {
   },
 
   es: {
-    cloudNetworkUnavailable: "No se pudo conectar al servicio de sincronizaci\u00f3n. Tus dibujos est\u00e1n guardados en este dispositivo.",
+    cloudNetworkUnavailable: "No se pudo sincronizar ahora. Tus dibujos siguen guardados en este dispositivo.",
     cloudCheckConflict: "Revisar sync",
     cloudConnectAccount: "Conectar cuenta de Google",
     cloudCheckAccess: "Verificar acceso",
@@ -725,14 +699,11 @@ const dictionary = {
     cloudReconnectDrive: "Reconectar Google Drive",
     cloudAccountMismatch: "Usa la misma cuenta de Google. Cierra sesi\u00f3n primero para cambiar de cuenta.",
     cloudChangedDuringResolution: "Una versi\u00f3n cambi\u00f3. Revisa las copias antes de elegir.",
-    cloudInvalidDocument: "Este dibujo contiene datos inv\u00e1lidos. Se conserv\u00f3 tu copia local.",
-    cloudSyncPartialFailure: "Algunos dibujos no se sincronizaron. Revisa los pendientes.",
+    cloudInvalidDocument: "No se pudo sincronizar este dibujo. Se conservó tu copia local.",
+    cloudSyncPartialFailure: "Algunos dibujos no se sincronizaron. Inténtalo de nuevo.",
     cloudBuyOnAndroid: "Compra Cloud Sync en la aplicaci\u00f3n Android y verifica el acceso aqu\u00ed con la misma cuenta de Google.",
-    cloudUnbasedConflict: "Se encontraron dos copias diferentes de \u00ab{title}\u00bb, sin una base com\u00fan verificada. Elige cu\u00e1l conservar.",
+    cloudUnbasedConflict: "Encontramos dos versiones diferentes de \u00ab{title}\u00bb. Elige cu\u00e1l conservar.",
     cloudReviewAgain: "Revisar de nuevo",
-    cloudPendingItems: "Elementos pendientes de sincronizaci\u00f3n",
-    cloudRetry: "Reintentar",
-    cloudLocalOnly: "Copia local",
     cloudConfirmSignOut: "\u00bfCerrar sesi\u00f3n? Se conservar\u00e1n los dibujos locales y los archivos en Drive.",
     cloudCopyToAccount: "Copiar a esta cuenta",
     cloudOtherAccount: "Vinculado a otra cuenta",
@@ -748,21 +719,11 @@ const dictionary = {
 
     settings: "Ajustes",
 
-    syncSummarySynced: "Sincronizado",
+    syncSummaryUnsyncedOne: "1 dibujo sin sincronizar",
 
-    syncSummaryPending: "Pendiente de sincronización",
+    syncSummaryUnsyncedMany: "{count} dibujos sin sincronizar",
 
-    syncSummaryAttention: "Necesita atención",
-
-    syncDrawingOne: "1 dibujo",
-
-    syncDrawingMany: "{count} dibujos",
-
-    syncDetails: "Detalles de sincronización",
-
-    drawingsSaved: "dibujos guardados",
-
-    synced: "sincronizados",
+    syncSummaryAllSynced: "Todos los dibujos están sincronizados",
 
     search: "Buscar dibujos o etiquetas",
 
@@ -1034,11 +995,11 @@ const dictionary = {
 
     cloudSyncOneTimePrice: "Compra única: {price}. El pago se realiza en Google Play.",
 
-    cloudSyncLockedStatus: "La sincronización en la nube está bloqueada en este dispositivo.",
+    cloudSyncLockedStatus: "La sincronización en la nube no está disponible para esta cuenta.",
 
     cloudSyncProductUnavailable:
 
-      "La compra aún no está disponible. Inténtalo de nuevo más tarde.",
+      "No se puede comprar la sincronización en la nube ahora.",
 
     cloudSyncPurchasePending:
 
@@ -1071,4 +1032,3 @@ export const useTranslations = (language = detectSystemLanguage()) => {
   return { language, t: strings };
 
 };
-

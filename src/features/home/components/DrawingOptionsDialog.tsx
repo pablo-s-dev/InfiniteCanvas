@@ -4,20 +4,23 @@ import { AppTheme } from "../../../shared/theme/appPalette";
 import { DrawingSummary } from "../../documents/drawingRepository";
 import { createStyles } from "../../home/homeStyles";
 import { webTitle } from "../../../shared/ui/webTitle";
-export function DrawingOptionsDialog({ drawing, theme, styles, labels, syncBusy, onClose, onSync, onResolveConflict, onDuplicate, onDelete, }: {
+export function DrawingOptionsDialog({ drawing, foreignAccount, theme, styles, labels, syncBusy, onClose, onCopyToAccount, onSync, onResolveConflict, onDuplicate, onDelete, }: {
     drawing: DrawingSummary | null;
+    foreignAccount: boolean;
     theme: AppTheme;
     styles: ReturnType<typeof createStyles>;
     labels: {
         title: string;
         close: string;
         sync: string;
+        copyToAccount: string;
         resolveConflict: string;
         duplicate: string;
         delete: string;
     };
     syncBusy: boolean;
     onClose: () => void;
+    onCopyToAccount: () => void;
     onSync: () => void;
     onResolveConflict: () => void;
     onDuplicate: () => void;
@@ -40,7 +43,10 @@ export function DrawingOptionsDialog({ drawing, theme, styles, labels, syncBusy,
               <AppIcon icon="mdi:close-circle-outline" size={20} color={theme.textMuted}/>
             </Pressable>
           </View>
-          {drawing.syncConflict ? (<Pressable accessibilityRole="button" style={styles.optionsAction} onPress={onResolveConflict} {...webTitle(labels.resolveConflict)}>
+          {foreignAccount ? (<Pressable accessibilityRole="button" accessibilityState={{ disabled: syncBusy }} disabled={syncBusy} style={[styles.optionsAction, syncBusy && styles.optionsActionDisabled]} onPress={onCopyToAccount} {...webTitle(labels.copyToAccount)}>
+              <AppIcon icon="mdi:content-copy" size={20} color={theme.primary}/>
+              <Text style={styles.optionsActionText}>{labels.copyToAccount}</Text>
+            </Pressable>) : drawing.syncConflict ? (<Pressable accessibilityRole="button" style={styles.optionsAction} onPress={onResolveConflict} {...webTitle(labels.resolveConflict)}>
               <AppIcon icon="mdi:alert-circle-outline" size={20} color={theme.primary}/>
               <Text style={styles.optionsActionText}>
                 {labels.resolveConflict}

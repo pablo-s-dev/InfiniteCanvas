@@ -17,7 +17,13 @@ export type SyncState =
   | { status: "unavailable"; reason: string }
   | { status: "ready"; email?: string }
   | { status: "syncing" }
-  | { status: "error"; message: string; code?: string };
+  | { status: "error"; message: string; code?: string; diagnostic?: CloudSyncDiagnostic };
+
+export type CloudSyncDiagnostic = {
+  stage: string;
+  code: string;
+  status?: number;
+};
 
 export type SyncFile = {
   id: string;
@@ -62,7 +68,6 @@ type NativeIntegrityModule = {
 };
 
 type ServiceSession = {
-  localTestOnly?: boolean;
   token: string;
   expiresAt: string;
   email: string;
@@ -72,6 +77,13 @@ type ServiceSession = {
 type ApiErrorPayload = {
   error?: { code?: string; message?: string };
 };
+
+function logCloudSyncDiagnostic(diagnostic: CloudSyncDiagnostic): CloudSyncDiagnostic {
+  if (__DEV__ && Platform.OS === "android") {
+    console.warn(`[CloudSync] ${JSON.stringify(diagnostic)}`);
+  }
+  return diagnostic;
+}
 
 declare global {
   interface Window {
@@ -104,6 +116,7 @@ export class CloudSyncApiError extends Error {
     message: string,
     public readonly code: string,
     public readonly status: number,
+    public readonly diagnostic?: CloudSyncDiagnostic,
   ) {
     super(message);
     this.name = "CloudSyncApiError";
@@ -191,8 +204,7 @@ export class GoogleDriveSync {
       return this.state;
     }
 
-    if (!options.reauthorize && await this.restoreSession() &&
-        (prompt === "" || this.session?.localTestOnly !== true)) {
+    if (!options.reauthorize && await this.restoreSession()) {
       try {
         await this.getEntitlement();
         this.state = { status: "ready", email: this.session?.email };
@@ -471,12 +483,14 @@ export class GoogleDriveSync {
 
   private async signInNative({ silent }: { silent: boolean }): Promise<SyncState> {
     const loginGeneration = this.sessionGeneration;
+    let stage = "load_native_module";
     try {
       const native = await this.loadNativeGoogleSignIn();
       const {
         GoogleSignin,
       } = native;
       this.configureNativeGoogleSignIn(GoogleSignin);
+      stage = "check_play_services";
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
 
       if (silent && !GoogleSignin.hasPreviousSignIn()) {
@@ -485,6 +499,7 @@ export class GoogleDriveSync {
       }
       let response: NativeGoogleSignInSuccess;
       if (silent) {
+        stage = "google_sign_in_silent";
         const silentResponse = await GoogleSignin.signInSilently();
         if (silentResponse.type === "noSavedCredentialFound") {
           this.state = { status: "signed-out" };
@@ -496,12 +511,15 @@ export class GoogleDriveSync {
         }
         response = silentResponse;
       } else {
+        stage = "google_sign_in";
         const signInResponse = await GoogleSignin.signIn();
         if (signInResponse.type === "cancelled") {
+          const diagnostic = logCloudSyncDiagnostic({ stage, code: "google_sign_in_cancelled" });
           this.state = {
             status: "error",
             code: "google_sign_in_cancelled",
             message: "Google sign-in was closed before it finished.",
+            diagnostic,
           };
           return this.state;
         }
@@ -526,14 +544,17 @@ export class GoogleDriveSync {
 
       const driveScopes = [DRIVE_FILE_SCOPE, LEGACY_APP_DATA_SCOPE];
       if (!driveScopes.every((scope) => response.data.scopes.includes(scope))) {
+        stage = "request_drive_scopes";
         const scopeResponse = await GoogleSignin.addScopes({
           scopes: driveScopes,
         });
         if (!scopeResponse || scopeResponse.type !== "success" || !scopeResponse.data) {
+          const diagnostic = logCloudSyncDiagnostic({ stage, code: "missing_drive_scope" });
           this.state = {
             status: "error",
             code: "missing_drive_scope",
             message: "Google Drive permission was not granted.",
+            diagnostic,
           };
           return this.state;
         }
@@ -541,13 +562,16 @@ export class GoogleDriveSync {
       }
       const serverAuthCode = response.data.serverAuthCode;
       if (!serverAuthCode) {
+        const diagnostic = logCloudSyncDiagnostic({ stage: "read_server_auth_code", code: "missing_server_auth_code" });
         this.state = {
           status: "error",
           code: "missing_server_auth_code",
           message: "Google did not return a secure sign-in code. Reconnect and try again.",
+          diagnostic,
         };
         return this.state;
       }
+      stage = "exchange_authorization_code";
       const session = await this.exchangeAuthorizationCode(serverAuthCode, "android", loginGeneration);
       this.state = { status: "ready", email: session.email };
       return this.state;
@@ -555,9 +579,11 @@ export class GoogleDriveSync {
       const native = await this.loadNativeGoogleSignIn().catch(() => null);
       if (native?.isErrorWithCode(error)) {
         const { statusCodes } = native;
+        const diagnostic = logCloudSyncDiagnostic({ stage, code: error.code });
         this.state = {
           status: "error",
           code: error.code,
+          diagnostic,
           message:
             error.code === "DEVELOPER_ERROR"
               ? "Google sign-in is misconfigured for this Android build. Check OAuth IDs, package name, and signing fingerprints."
@@ -569,10 +595,20 @@ export class GoogleDriveSync {
         };
         return this.state;
       }
+      const diagnostic = logCloudSyncDiagnostic({
+        stage,
+        code: error instanceof CloudSyncApiError
+          ? error.code
+          : error instanceof Error
+            ? error.name
+            : "unknown_error",
+        ...(error instanceof CloudSyncApiError ? { status: error.status } : {}),
+      });
       this.state = {
         status: "error",
         code: error instanceof CloudSyncApiError ? error.code : undefined,
         message: error instanceof Error ? error.message : "Google sign-in failed.",
+        diagnostic,
       };
       return this.state;
     }
@@ -652,7 +688,6 @@ export class GoogleDriveSync {
         expiresAt: parsed.expiresAt,
         email: parsed.email,
         accountBinding: parsed.accountBinding,
-        ...(parsed.localTestOnly === true ? { localTestOnly: true } : {}),
       };
       this.state = { status: "ready", email: parsed.email };
       return true;
@@ -676,7 +711,9 @@ export class GoogleDriveSync {
   }
 
   private async loadNativeGoogleSignIn(): Promise<NativeGoogleSignInModule> {
-    return import("@react-native-google-signin/google-signin");
+    // Keep native dependencies in Metro's main bundle, but only evaluate them
+    // when native sign-in is requested (never while starting the web app).
+    return require("@react-native-google-signin/google-signin") as NativeGoogleSignInModule;
   }
 
   private configureNativeGoogleSignIn(
@@ -843,8 +880,9 @@ export const googleDriveSync = new GoogleDriveSync({
       : undefined,
   apiUrl:
     typeof process !== "undefined"
-      ? (Platform.OS === "web" && typeof window !== "undefined" ? `${window.location.origin}/api` : process.env.EXPO_PUBLIC_CLOUD_SYNC_API_URL) ??
-        (__DEV__ && Platform.OS === "web" ? "http://localhost:8788" : undefined)
+      ? Platform.OS === "web" && typeof window !== "undefined"
+        ? `${window.location.origin}/api`
+        : process.env.EXPO_PUBLIC_CLOUD_SYNC_API_URL
       : undefined,
 
 });

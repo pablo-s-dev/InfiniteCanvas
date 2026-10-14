@@ -5,7 +5,7 @@ import { useTranslations, detectSystemLanguage, type SupportedLanguage } from ".
 import type { ToastState } from "../../../shared/ui/toastTypes";
 import { drawingRepository, type DrawingSummary } from "../../documents/drawingRepository";
 import type { CanvasDocument } from "../../canvas/document";
-import { googleDriveSync, CloudSyncApiError, type CloudSyncAccount, type SyncState } from "../googleDriveSync";
+import { googleDriveSync, CloudSyncApiError, type CloudSyncAccount, type CloudSyncDiagnostic, type SyncState } from "../googleDriveSync";
 import { cloudSyncBilling, type CloudSyncPurchaseStatus } from "../cloudSyncBilling";
 import { runCloudSync, assertSyncAccount, withSyncLock, uploadSnapshot, deleteSnapshot, adoptRemote } from "../syncEngine";
 import { compareSyncVersions, syncContentHash } from "../syncContent";
@@ -37,7 +37,6 @@ function useCloudSyncController() {
   const [inspection, setInspection] = useState<ConflictInspection | null>(null);
   const [resolvedVersion, setResolvedVersion] = useState(0);
   const [repositoryVersion, setRepositoryVersion] = useState(0);
-  const [pendingItems, setPendingItems] = useState<(DrawingSummary & {foreignAccount: boolean})[]>([]);
   const [foreignDrawingIds, setForeignDrawingIds] = useState<string[]>([]);
   const generation = useRef(0);
   const conflictGeneration = useRef(0);
@@ -70,10 +69,20 @@ function useCloudSyncController() {
   };
   const handleError = (error: unknown) => {
     if (error instanceof CloudSyncApiError && error.code === "account_changed") return;
+    if (__DEV__ && Platform.OS === "android") {
+      const diagnostic: CloudSyncDiagnostic = error instanceof CloudSyncApiError
+        ? error.diagnostic ?? {stage: "cloud_sync", code: error.code, status: error.status}
+        : {stage: "cloud_sync", code: error instanceof Error ? error.name : "unknown_error"};
+      console.warn("[CloudSync]", diagnostic);
+    }
     if (error instanceof CloudSyncApiError && ["session_expired", "session_required"].includes(error.code)) {
       setAccountStatus("expired"); setEntitlementStatus("unknown");
       setVerifiedConflictIds([]);
-    } else setEntitlementStatus("error");
+    } else {
+      const settledAccountStatus = accountRef.current ? "connected" : "signed-out";
+      setAccountStatus(status => status === "checking" || status === "signing-in" ? settledAccountStatus : status);
+      setEntitlementStatus("error");
+    }
     setSyncError(message(error));
   };
   async function checkAccount(): Promise<CloudSyncAccount | null> {
@@ -117,7 +126,7 @@ function useCloudSyncController() {
     let connected = false;
     await runOperation(async () => {
       const result = await login; guard();
-      if (result.status !== "ready") {setAccountStatus(accountRef.current ? "connected" : "signed-out"); throw new CloudSyncApiError(result.status === "error" ? result.message : "Sign-in failed.", result.status === "error" ? result.code ?? "sign_in_failed" : "sign_in_failed", 400);}
+      if (result.status !== "ready") {setAccountStatus(accountRef.current ? "connected" : "signed-out"); throw new CloudSyncApiError(result.status === "error" ? result.message : "Sign-in failed.", result.status === "error" ? result.code ?? "sign_in_failed" : "sign_in_failed", 400, result.status === "error" ? result.diagnostic : undefined);}
       const next = await googleDriveSync.getAccount(); guard(); applyAccount(next); connected = true;
       if (next.entitlement.active === false) {setCloudSyncPaywallOpen(next.entitlement.status !== "pending"); return;}
       if (next.drive === "ready") await performSync();
@@ -224,12 +233,10 @@ function useCloudSyncController() {
   }
   useEffect(() => {
     let canceled = false;
-    void Promise.all([drawingRepository.listIncludingDeleted(), syncBindings.list()]).then(([drawings, bindings]) => {
+    void syncBindings.list().then((bindings) => {
       if (canceled) return;
       const foreign = new Set(bindings.filter(binding => account && binding.accountBinding !== account.accountBinding).map(binding => binding.drawingId));
       setForeignDrawingIds([...foreign]);
-      setPendingItems(drawings.filter(drawing => drawing.syncConflict || drawing.syncStatus === "failed" || drawing.syncStatus === "pending" || foreign.has(drawing.id))
-        .map(drawing => ({...drawing, foreignAccount: foreign.has(drawing.id)})));
     });
     return () => {canceled = true;};
   }, [repositoryVersion, account?.accountBinding]);
@@ -265,7 +272,7 @@ function useCloudSyncController() {
     if (accountRef.current.drive === "reauthorization-required") return void connectDrive();
     void syncLocalDrawings();
   };
-  return {conflictAction: () => {if (!googleDriveSync.isReady()) void connectDrive({expectedAccountBinding: inspection?.accountBinding}); else mainAction();}, verifiedConflictIds, pendingItems, foreignDrawingIds, copyToCurrentAccount, language, setLanguage, account, accountStatus, entitlementStatus, busy, syncError, mainAction, signOut,
+  return {conflictAction: () => {if (!googleDriveSync.isReady()) void connectDrive({expectedAccountBinding: inspection?.accountBinding}); else mainAction();}, verifiedConflictIds, foreignDrawingIds, copyToCurrentAccount, language, setLanguage, account, accountStatus, entitlementStatus, busy, syncError, mainAction, signOut,
     conflictBusy, conflictError, inspection, inspectConflict, resolvedVersion, repositoryVersion,
     clearConflictError: () => {conflictGeneration.current += 1; setConflictError(null); setInspection(null); setConflictBusy(false);},
     syncState, syncMessage, cloudSyncPurchaseStatus, billingReady, cloudSyncPaywallOpen, setCloudSyncPaywallOpen,

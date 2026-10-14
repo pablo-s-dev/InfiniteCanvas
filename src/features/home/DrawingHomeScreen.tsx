@@ -17,8 +17,10 @@ import { useHomeQueryParams } from "./useHomeQueryParams";
 import { DrawingPreview } from "./DrawingPreview";
 import { createStyles } from "./homeStyles";
 import { webTitle } from "../../shared/ui/webTitle";
+import { DrawingTagsDialog } from "../documents/components/DrawingTagsDialog";
 import type { ScreenMode, LibrarySortMode, ToastState } from "./homeTypes";
 import { describeSyncState, importErrorMessage, formatDrawingsDeletedMessage, formatDrawingsImportedMessage, formatSelectedCount, formatUpdatedAt, parseTagsParam, stringifyTagsParam, isLibrarySortMode } from "./homeFormatting";
+import { countUnsyncedDrawings } from "./syncSummary";
 import { CloudSyncPaywall } from "../sync/components/CloudSyncPaywall";
 import { TagChips } from "../home/components/TagChips";
 import { HomeBottomNav } from "../home/components/HomeBottomNav";
@@ -49,9 +51,11 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
     const [mode, setMode] = useState<ScreenMode>("library");
     const [toast, setToast] = useState<ToastState | null>(null);
     const [conflictDrawing, setConflictDrawing] = useState<DrawingSummary | null>(null);
-    const [pendingDialogOpen, setPendingDialogOpen] = useState(false);
     const [signOutConfirm, setSignOutConfirm] = useState(false);
     const [tagDialogOpen, setTagDialogOpen] = useState(false);
+    const [tagEditingDrawing, setTagEditingDrawing] = useState<DrawingSummary | null>(null);
+    const [tagEditingSelection, setTagEditingSelection] = useState<string[]>([]);
+    const [savingDrawingTags, setSavingDrawingTags] = useState(false);
     const [newTagName, setNewTagName] = useState("");
     const [selectedDrawingIds, setSelectedDrawingIds] = useState<string[]>([]);
     const [optionsDrawing, setOptionsDrawing] = useState<DrawingSummary | null>(null);
@@ -77,7 +81,7 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
             setLoading(false);
         }
     };
-    const { conflictAction, verifiedConflictIds, pendingItems, foreignDrawingIds, copyToCurrentAccount, account, accountStatus, entitlementStatus, busy, syncError, mainAction, signOut, inspection, inspectConflict, conflictBusy, conflictError, clearConflictError, syncState, syncMessage, cloudSyncPurchaseStatus, billingReady, cloudSyncPaywallOpen, setCloudSyncPaywallOpen, billingBusy, billingAction, billingFeedback, hasCloudSyncAccess, openCloudSyncPaywall, connectDrive, syncLocalDrawings, syncDrawing, resolveConflict, buyCloudSync, restoreCloudSyncPurchase } = useCloudSync({ drawings, loading, language, loadDrawings, setToast,
+    const { conflictAction, verifiedConflictIds, foreignDrawingIds, copyToCurrentAccount, account, accountStatus, entitlementStatus, busy, syncError, mainAction, signOut, inspection, inspectConflict, conflictBusy, conflictError, clearConflictError, syncState, syncMessage, cloudSyncPurchaseStatus, billingReady, cloudSyncPaywallOpen, setCloudSyncPaywallOpen, billingBusy, billingAction, billingFeedback, hasCloudSyncAccess, openCloudSyncPaywall, connectDrive, syncLocalDrawings, syncDrawing, resolveConflict, buyCloudSync, restoreCloudSyncPurchase } = useCloudSync({ drawings, loading, language, loadDrawings, setToast,
         onConflictResolved: () => setConflictDrawing(null) });
     useEffect(() => {
         loadDrawings();
@@ -93,13 +97,7 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
         const drawingTags = drawings.flatMap((drawing) => drawing.flatTags);
         return Array.from(new Set([...customTags, ...drawingTags])).sort((a, b) => a.localeCompare(b));
     }, [customTags, drawings]);
-    const syncedCount = drawings.filter((drawing) => !foreignDrawingIds.includes(drawing.id) && !drawing.syncConflict &&
-        drawing.syncStatus !== "pending" &&
-        drawing.syncStatus !== "failed" &&
-        Boolean(drawing.driveFileId)).length;
-    const pendingCount = pendingItems.filter(drawing => !drawing.foreignAccount && !drawing.syncConflict && drawing.syncStatus === "pending").length;
-    const failedCount = pendingItems.filter(drawing => !drawing.foreignAccount && drawing.syncStatus === "failed").length;
-    const conflictCount = pendingItems.filter(drawing => !drawing.foreignAccount && drawing.syncConflict).length;
+    const unsyncedCount = countUnsyncedDrawings(drawings, foreignDrawingIds);
     const filteredDrawings = useMemo(() => {
         const normalizedQuery = queryParams.query.trim().toLowerCase();
         const matches = drawings.filter((drawing) => {
@@ -232,12 +230,51 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
         const name = newTagName.trim();
         if (!name)
             return;
-        const nextTags = Array.from(new Set([...customTags, name])).sort();
+        const canonicalName = allTags.find((tag) => tag.toLowerCase() === name.toLowerCase()) ?? name;
+        const nextTags = Array.from(new Set([...customTags, canonicalName])).sort();
         setCustomTags(nextTags);
         await jsonStorage.set(CUSTOM_TAGS_STORAGE_KEY, nextTags);
-        setSelectedTags(Array.from(new Set([...selectedTags, name])));
+        if (tagEditingDrawing) {
+            setTagEditingSelection((current) => current.includes(canonicalName) ? current : [...current, canonicalName]);
+        }
+        else {
+            setSelectedTags(Array.from(new Set([...selectedTags, canonicalName])));
+        }
         setNewTagName("");
         setTagDialogOpen(false);
+    };
+    const openDrawingTagEditor = (drawing: DrawingSummary) => {
+        setTagEditingDrawing(drawing);
+        setTagEditingSelection([...drawing.flatTags]);
+    };
+    const toggleDrawingTag = (tag: string) => {
+        setTagEditingSelection((current) => current.includes(tag)
+            ? current.filter((selectedTag) => selectedTag !== tag)
+            : [...current, tag]);
+    };
+    const saveDrawingTags = async () => {
+        if (!tagEditingDrawing || savingDrawingTags)
+            return;
+        setSavingDrawingTags(true);
+        try {
+            await drawingRepository.updateTags(
+                tagEditingDrawing.id,
+                tagEditingSelection.map((name) => new CompositeTag({ name })),
+            );
+            await loadDrawings();
+            setTagEditingDrawing(null);
+        }
+        catch (error) {
+            const errorToast: ToastState = {
+                message: errorMessageOf(error, t.saveDrawingFailed),
+                tone: "error",
+            };
+            setToast(errorToast);
+            setTimeout(() => setToast((current) => current === errorToast ? null : current), 7000);
+        }
+        finally {
+            setSavingDrawingTags(false);
+        }
     };
     useEffect(() => { if (conflictDrawing) void inspectConflict(conflictDrawing.id); }, [conflictDrawing?.id, account?.accountBinding, account?.entitlement.active, account?.drive]);
     const syncStatusLabel = syncError ?? (busy ? syncMessage ?? t.cloudCheckingAccount
@@ -304,7 +341,7 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
             <Pressable accessibilityRole="button" accessibilityLabel={t.clearSelection} style={styles.selectionFab} onPress={clearSelection} {...webTitle(t.clearSelection)}>
               <AppIcon icon="mdi:close-circle-outline" size={20} color={theme.textMuted}/>
             </Pressable>
-          </View>) : (<TagChips allLabel={t.all} tags={allTags} selectedTags={selectedTags} onToggleTag={toggleTag} onAddTag={() => setTagDialogOpen(true)} styles={styles} theme={theme}/>)}
+          </View>) : (<TagChips allLabel={t.all} addTagLabel={t.addTag} tags={allTags} selectedTags={selectedTags} onToggleTag={toggleTag} onAddTag={() => setTagDialogOpen(true)} styles={styles} theme={theme}/>)}
       </View>
 
       {loading ? (<View style={styles.emptyState}>
@@ -333,7 +370,8 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
                                 ? t.syncedBadge
                                 : null;
                 return (<Pressable key={item.id} accessibilityLabel={item.title} accessibilityHint={t.holdToSelect} delayLongPress={450} style={[styles.card, selected && styles.cardSelected]} onPress={() => handleDrawingPress(item)} onLongPress={() => handleDrawingLongPress(item.id)}>
-                  {syncBadgeLabel ? (<View pointerEvents="none" style={[
+                  {syncBadgeLabel ? (<View style={[
+                            { pointerEvents: "none" },
                             styles.syncBadge,
                             styles.cardSyncBadge,
                             (item.syncConflict || item.syncStatus === "failed") &&
@@ -362,7 +400,7 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
                     </Text>
                     <Pressable accessibilityRole="button" accessibilityLabel={`${t.editDrawingTags}: ${item.title}`} style={styles.cardTagsButton} onPress={(event) => {
                         event.stopPropagation?.();
-                        onOpenCanvas(item, true, allTags);
+                        openDrawingTagEditor(item);
                     }} {...webTitle(t.editDrawingTags)}>
                       <AppIcon icon="mdi:tag-multiple-outline" size={15} color={theme.accent}/>
                       <Text style={styles.cardTagsButtonText} numberOfLines={1}>
@@ -398,11 +436,11 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
           <Text style={styles.eyebrow}>{t.tags}</Text>
           <Text style={styles.title}>{t.tags}</Text>
         </View>
-        <Pressable style={styles.newButton} onPress={() => setTagDialogOpen(true)}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t.addTag} style={styles.newButton} onPress={() => setTagDialogOpen(true)} {...webTitle(t.addTag)}>
           <AppIcon icon="mdi:plus" size={21} color={theme.primaryText}/>
         </Pressable>
       </View>
-      <TagChips allLabel={t.all} tags={allTags} selectedTags={selectedTags} onToggleTag={toggleTag} onAddTag={() => setTagDialogOpen(true)} styles={styles} theme={theme}/>
+      <TagChips allLabel={t.all} addTagLabel={t.addTag} tags={allTags} selectedTags={selectedTags} onToggleTag={toggleTag} onAddTag={() => setTagDialogOpen(true)} styles={styles} theme={theme}/>
     </>);
     const renderSettings = () => (<>
       <View style={styles.headerRow}>
@@ -424,7 +462,7 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
           {(busy || accountStatus === "checking") && <ActivityIndicator color={theme.primary}/>}
           <Text style={styles.inlineStatusText}>{syncStatusLabel}</Text>
         </View>
-        {<SyncSummary statusLabel={!account ? t.cloudLocalOnly : foreignDrawingIds.length && !pendingCount && !failedCount && !conflictCount ? t.cloudOtherAccount : undefined} onAttention={() => setPendingDialogOpen(true)} total={drawings.length} synced={syncedCount} pending={pendingCount} failed={failedCount} conflicts={conflictCount} theme={theme} labels={t} />}
+        <SyncSummary unsyncedCount={unsyncedCount} theme={theme} labels={t} styles={styles} />
         <Pressable accessibilityLabel={syncButtonLabel} disabled={busy || accountStatus === "checking"} style={[
             styles.primaryButtonWide, (busy || accountStatus === "checking") && styles.primaryButtonWideDisabled,
         ]} onPress={mainAction} {...webTitle(syncButtonLabel)}>
@@ -487,6 +525,24 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
         </View>
       </ScrollView>
       <HomeBottomNav mode={mode} setMode={setMode} styles={styles} theme={theme} labels={{ library: t.library, tags: t.tags, settings: t.settings }}/>
+      <DrawingTagsDialog
+        visible={tagEditingDrawing !== null}
+        drawingTitle={tagEditingDrawing?.title ?? ""}
+        tags={allTags}
+        selectedTags={tagEditingSelection}
+        saving={savingDrawingTags}
+        onToggleTag={toggleDrawingTag}
+        onAddTag={() => setTagDialogOpen(true)}
+        onCancel={() => setTagEditingDrawing(null)}
+        onSave={() => void saveDrawingTags()}
+        labels={{
+            title: t.editDrawingTags,
+            noTags: t.tagOptionsEmpty,
+            addTag: t.addTag,
+            cancel: t.cancel,
+            save: t.save,
+        }}
+      />
       <TagDialog visible={tagDialogOpen} value={newTagName} setValue={setNewTagName} onCancel={() => setTagDialogOpen(false)} onSave={createTag} styles={styles} labels={{ title: t.addTag, input: t.tagName, save: t.save, cancel: t.cancel }}/>
       <ConflictDialog theme={theme} inspection={inspection} canResolve={Boolean(inspection?.remote && account?.entitlement.active && account.drive === "ready")} prerequisiteLabel={syncButtonLabel} onPrerequisite={conflictAction} onReview={() => { if (conflictDrawing) void inspectConflict(conflictDrawing.id); }} busy={conflictBusy} error={conflictError} drawing={inspection?.local.metadata ?? conflictDrawing} onCancel={() => { clearConflictError(); setConflictDrawing(null); }} onResolve={resolveConflict} styles={styles} labels={{
             title: t.resolveSyncConflict,
@@ -502,14 +558,21 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
             duplicateBoth: t.duplicateBoth,
             cancel: t.cancel,
         }}/>
-      <DrawingOptionsDialog drawing={optionsDrawing} theme={theme} styles={styles} labels={{
+      <DrawingOptionsDialog drawing={optionsDrawing} foreignAccount={Boolean(optionsDrawing && foreignDrawingIds.includes(optionsDrawing.id))} theme={theme} styles={styles} labels={{
             title: t.moreOptions,
             close: t.cancel,
             sync: t.syncNow,
+            copyToAccount: t.cloudCopyToAccount,
             resolveConflict: t.resolveSyncConflict,
             duplicate: t.duplicateDrawing,
             delete: t.deleteDrawing,
-        }} syncBusy={syncState.status === "syncing"} onClose={() => setOptionsDrawing(null)} onSync={() => {
+        }} syncBusy={syncState.status === "syncing"} onClose={() => setOptionsDrawing(null)} onCopyToAccount={() => {
+            if (!optionsDrawing)
+                return;
+            const drawingId = optionsDrawing.id;
+            setOptionsDrawing(null);
+            void copyToCurrentAccount(drawingId);
+        }} onSync={() => {
             if (!optionsDrawing)
                 return;
             const drawing = optionsDrawing;
@@ -544,21 +607,6 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
             checking: t.cloudSyncCheckingPurchase,
             priceLine: t.cloudSyncOneTimePrice,
         }}/>
-      <Modal transparent visible={pendingDialogOpen} animationType="fade" onRequestClose={() => setPendingDialogOpen(false)}>
-        <View style={styles.dialogBackdrop}><View style={styles.dialog}>
-          <Text style={styles.dialogTitle}>{t.cloudPendingItems}</Text>
-          <ScrollView style={{maxHeight: 330}}>
-            {pendingItems.map(item => <View key={item.id} style={{marginTop: 12, gap: 8}}>
-              <Text style={styles.dialogHelpText}>{item.title}</Text>
-              <Text style={styles.cardMeta}>{item.foreignAccount ? t.cloudOtherAccount : item.syncConflict ? verifiedConflictIds.includes(item.id) ? t.conflicts : t.cloudCheckConflict : item.syncStatus === "failed" ? t.googleDriveSyncFailed : t.cloudLocalOnly}</Text>
-              <Pressable style={styles.dialogButton} {...webTitle(item.foreignAccount ? t.cloudCopyToAccount : item.syncConflict ? t.resolveSyncConflict : t.cloudRetry)} onPress={() => {
-                setPendingDialogOpen(false); if (item.foreignAccount) void copyToCurrentAccount(item.id); else if (item.syncConflict) setConflictDrawing(item); else mainAction();
-              }}><Text style={styles.dialogButtonText}>{item.foreignAccount ? t.cloudCopyToAccount : item.syncConflict ? t.resolveSyncConflict : t.cloudRetry}</Text></Pressable>
-            </View>)}
-          </ScrollView>
-          <Pressable style={styles.dialogButton} onPress={() => setPendingDialogOpen(false)} {...webTitle(t.close)}><Text style={styles.dialogButtonText}>{t.close}</Text></Pressable>
-        </View></View>
-      </Modal>
       <Modal transparent visible={signOutConfirm} animationType="fade" onRequestClose={() => setSignOutConfirm(false)}>
         <View style={styles.dialogBackdrop}><View style={styles.dialog}>
           <Text style={styles.dialogTitle}>{t.cloudSignOut}</Text><Text style={styles.dialogHelpText}>{t.cloudConfirmSignOut}</Text>
