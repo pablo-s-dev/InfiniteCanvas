@@ -4,7 +4,7 @@ import { visibleDrawingItemsFromHistory } from "./drawingGeometry";
 export const createCanvasItemId = (prefix = "item") => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 export const getPanOffsetDelta = (screenDelta: number, zoom: number) => {
     const safeZoom = Math.max(zoom, 0.1);
-    return screenDelta / (safeZoom * safeZoom);
+    return screenDelta / safeZoom;
 };
 export const getVisibleCanvasItems = (items: DrawingItem[]): VisibleDrawingItem[] => {
     return visibleDrawingItemsFromHistory(items);
