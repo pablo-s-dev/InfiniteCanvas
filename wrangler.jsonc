@@ -34,5 +34,41 @@
       "database_id": "00000000-0000-4000-8000-000000000001",
       "migrations_dir": "worker/migrations"
     }
-  ]
+  ],
+  "env": {
+    "staging": {
+      "name": "infinitecanvas-sync-staging",
+      "workers_dev": true,
+      "preview_urls": false,
+      "vars": {
+        "APP_PACKAGE_NAME": "com.PabloS.InfiniteCanvas",
+        "CLOUD_SYNC_PRODUCT_ID": "cloud_sync_unlock",
+        "LOCAL_DEV_MODE": "false",
+        "ALLOWED_WEB_ORIGINS": "https://infinitecanvas-sync-staging.piblio10.workers.dev,http://localhost:8081,http://127.0.0.1:8081",
+        "PLAY_RTDN_OIDC_AUDIENCE": "",
+        "PLAY_RTDN_SERVICE_ACCOUNT_EMAIL": ""
+      },
+      "secrets": {
+        "required": [
+          "GOOGLE_OAUTH_CLIENT_ID",
+          "GOOGLE_OAUTH_CLIENT_SECRET",
+          "TOKEN_ENCRYPTION_KEY",
+          "PLAY_SERVICE_ACCOUNT_JSON"
+        ]
+      },
+      "d1_databases": [{
+        "binding": "DB",
+        "database_name": "infinitecanvas-sync-staging",
+        "database_id": "be51fb2c-be1f-4b02-afbf-2b7c13cfccf3",
+        "migrations_dir": "worker/migrations"
+      }],
+      "assets": {
+        "directory": "./dist",
+        "binding": "ASSETS",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*", "/v1/*", "/health"]
+      },
+      "triggers": { "crons": ["17 * * * *"] }
+    }
+  }
 }

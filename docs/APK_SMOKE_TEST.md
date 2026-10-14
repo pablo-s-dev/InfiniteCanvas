@@ -3,7 +3,7 @@
 Use this after building:
 
 ```powershell
-npm run android:apk
+npm run build:android:apk
 ```
 
 APK path:
@@ -54,7 +54,7 @@ Requires the Android OAuth client/SHA-1 to be registered for package
 Run web dev server:
 
 ```powershell
-npx expo start --port 8081
+npm run dev:local -- web
 ```
 
 - [ ] Embedded Memory Copilot iframe receives `READY`.

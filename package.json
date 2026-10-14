@@ -1,23 +1,23 @@
 {
   "name": "infinitecanvas",
-  "version": "1.1.0-alpha.7",
+  "version": "1.1.0-alpha.9",
   "main": "AppEntry.js",
   "scripts": {
-    "start": "expo start",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "web": "expo start --web --port 8081",
+    "dev:local": "node scripts/dev.js local",
+    "dev:cloud": "node scripts/dev.js cloud",
+    "dev:stop": "node scripts/dev-stop.js",
+    "worker:local": "node scripts/dev.js worker",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "doctor": "npx expo-doctor",
     "verify": "npm run typecheck && npm run test && npm run doctor",
-    "build:web": "expo export --platform web --output-dir dist",
-    "worker:dev": "wrangler dev --local --port 8788",
+    "build:web": "node scripts/release-web.js",
+    "test:release-config": "node --test scripts/release-config.test.cjs",
+    "deploy:staging": "npm run build:web && wrangler deploy --env staging",
     "worker:migrate:local": "wrangler d1 migrations apply infinitecanvas-sync-dev --local",
     "worker:typecheck": "tsc --noEmit -p worker/tsconfig.json",
-    "android:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-android-apk.ps1",
-    "android:apk:arm64": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-android-apk.ps1 -Architectures arm64-v8a",
-    "android:aab": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-android-aab.ps1"
+    "build:android:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-android-apk.ps1",
+    "build:android:aab": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-android-aab.ps1"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.13",

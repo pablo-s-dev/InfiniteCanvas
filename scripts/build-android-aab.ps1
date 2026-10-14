@@ -1,5 +1,6 @@
 param(
-  [string]$Architectures = ""
+  [string]$Architectures = "",
+  [string]$CloudEnvironmentFile = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -9,6 +10,18 @@ $android = Join-Path $root "android"
 $javaHome = "C:\Program Files\Android\Android Studio\jbr"
 $gradleHome = "D:\gradle-cache"
 $tempRoot = "D:\temp"
+
+# Load the checked public release settings before Expo embeds the JavaScript.
+# Existing terminal settings and .env.local must never silently remove the verifier.
+if (-not $CloudEnvironmentFile.Trim()) {
+  $CloudEnvironmentFile = Join-Path $root "config\staging.env"
+}
+$releaseConfig = & node (Join-Path $root "scripts\release-config.js") $CloudEnvironmentFile
+if ($LASTEXITCODE -ne 0) { throw "Android release configuration is incomplete or unsafe." }
+$publicEnvironment = $releaseConfig | ConvertFrom-Json
+foreach ($property in $publicEnvironment.PSObject.Properties) {
+  [Environment]::SetEnvironmentVariable($property.Name, $property.Value, "Process")
+}
 
 $requiredSigningVariables = @(
   "ANDROID_UPLOAD_STORE_FILE",

@@ -30,13 +30,21 @@ O servidor verifica a revisão e usa uma escrita condicional no Drive. Resolver 
 
 Worker e app validam profundamente o documento antes de usá-lo. Arquivos inválidos não substituem a última cópia local válida nem são marcados como sincronizados. Identificadores de arquivos no conteúdo nunca autorizam acesso ou exclusão: o servidor usa os vínculos da conta autenticada.
 
-No Android remoto, cada operação também exige Play Integrity. O acesso comprado é confirmado pelo servidor, não por um booleano local. A liberação de desenvolvimento exige identidade Google real verificada e uma concessão registrada no banco local; não representa compra na Play.
+No Android remoto, cada operação também exige Play Integrity. O acesso comprado é confirmado pelo servidor, não por um booleano local. Não há liberação por e-mail, concessão de desenvolvimento ou sessão fictícia. Uma compra pendente não libera o acesso; uma compra válida precisa corresponder à conta Google autenticada.
 
 ## Desenvolvimento
 
-Veja [configuração do Worker](../worker/README.md). Expo permanece em `http://localhost:8081`; o Worker local usa a porta 8788. Para o Android de desenvolvimento conectado por cabo, configure `EXPO_PUBLIC_CLOUD_SYNC_API_URL=http://127.0.0.1:8788` e encaminhe as portas 8081 e 8788 com `adb reverse` para o dispositivo escolhido.
+Veja [configuração do Worker](../worker/README.md). `npm run dev:local` inicia Expo em `http://localhost:8081` e o Worker local na porta 47329. A web chama `/api` e o Metro encaminha ao Worker. Para Android, `npm run dev:local -- android` configura o endereço do Worker e encaminha as portas automaticamente para uma instalação de desenvolvimento conectada.
 
-Em produção web, configure a rota `/api/*` na mesma origem para o Worker. Configure o banco e os secrets reais antes de qualquer publicação. Este trabalho não publica em produção.
+`npm run dev:cloud -- web` carrega a URL remota de `.env.cloud` como destino do proxy do Metro. O frontend e o Worker podem estar em hosts diferentes: `/api` é somente a origem do navegador, enquanto o proxy resolve o destino real. O Worker de staging precisa autorizar a origem local e manter CORS, cookie e checagem OAuth configurados. Android usa a URL remota diretamente.
+
+## Release de teste interno
+
+`config/staging.env` contém somente as três configurações públicas da release. `npm run build:web` e `npm run build:android:aab` carregam esse arquivo antes de o Expo incorporar os valores no JavaScript. Configuração incompleta, URL local ou credenciais dentro desse arquivo interrompem o build. Valores herdados do terminal não substituem o arquivo de release.
+
+`npm run deploy:staging` publica o site e o Worker juntos em `https://infinitecanvas-sync-staging.piblio10.workers.dev`. Os assets atendem as páginas e `/api/*`, `/v1/*` e `/health` são processados pelo Worker. O D1 e os secrets pertencem a esse ambiente separado. A origem precisa constar no cliente OAuth Web; o cliente Android deve corresponder ao certificado de assinatura da Play.
+
+Notificações RTDN ainda não estão configuradas nesse ambiente. Compras são verificadas imediatamente no envio do token; o cron revalida compras registradas a cada hora, e consultas de acesso também renovam verificações antigas. Isso significa que reembolsos podem levar até a próxima revalidação para remover acesso. Não trate `/health` como prova de compra ou sincronização: teste compra, restauração e envio de desenho com a instalação da Play.
 
 ## Glossário
 

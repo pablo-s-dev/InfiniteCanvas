@@ -44,13 +44,13 @@ touch user folders on `C:` even when Gradle cache and temp are redirected.
 Universal release APK:
 
 ```powershell
-npm run android:apk
+npm run build:android:apk
 ```
 
 Faster local device APK, arm64 only:
 
 ```powershell
-npm run android:apk:arm64
+npm run build:android:apk -- arm64-v8a
 ```
 
 Both scripts produce:
@@ -66,12 +66,18 @@ for direct install/testing, not Play Store production signing.
 
 The internal-testing build must use the app's existing EAS upload keystore.
 Keep the keystore and its passwords outside the repository, and set these
-process environment variables before running `npm run android:aab`:
+process environment variables before running `npm run build:android:aab`:
 
 - `ANDROID_UPLOAD_STORE_FILE`
 - `ANDROID_UPLOAD_STORE_PASSWORD`
 - `ANDROID_UPLOAD_KEY_ALIAS`
 - `ANDROID_UPLOAD_KEY_PASSWORD`
+
+The AAB build reads `config/staging.env` before Gradle bundles JavaScript.
+Only the public Worker URL, Google Web client ID, and Play Integrity project
+number belong there. Missing settings or a local URL stop the build. Use
+`-CloudEnvironmentFile` when targeting another explicitly configured release
+environment; do not put server secrets in this file.
 
 The AAB is written to `android\app\build\outputs\bundle\release\app-release.aab`.
 The build script refuses to create an AAB unless all signing variables are set.

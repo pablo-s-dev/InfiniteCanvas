@@ -6,21 +6,29 @@ O app conversa com este Worker; o Worker é que acessa a API do Google Drive e v
 
 1. Instale as dependências com `npm install`.
 2. O arquivo ignorado `.dev.vars` contém os valores de desenvolvimento. A chave `TOKEN_ENCRYPTION_KEY` local foi gerada aleatoriamente e é diferente de qualquer chave de produção.
-3. Aplique o esquema no banco D1 local: `npm run worker:migrate:local`.
-4. Inicie o serviço: `npm run worker:dev`. O endereço local é `http://localhost:8788`; `GET /health` verifica se ele está vivo.
-5. A web chama `/api` na mesma origem; o Metro encaminha ao Worker local na porta 8788. Para Android debug conectado por cabo, configure `EXPO_PUBLIC_CLOUD_SYNC_API_URL=http://127.0.0.1:8788` e execute `adb -s SERIAL reverse tcp:8788 tcp:8788` e `adb -s SERIAL reverse tcp:8081 tcp:8081`. Reinicie Expo após mudar as variáveis.
+3. Aplique o esquema no banco D1 local: `npm run worker:migrate:local` (na primeira configuração e após mudanças de esquema).
+4. Para iniciar somente o serviço, execute `npm run worker:local`. Ele escuta em `http://127.0.0.1:47329`; `GET /health` verifica se está ativo.
+5. Para iniciar o app web e o Worker juntos, execute `npm run dev:local -- web`. O navegador chama `/api` na origem local do Expo; o Metro encaminha ao Worker local configurado. Para Android por cabo, execute `npm run dev:local -- android`; o comando conecta uma instalação de desenvolvimento compatível e encaminha as portas do Expo e do Worker.
 
 Sem credenciais externas, `/health` e o esquema local funcionam, mas login, Drive, compras e Integrity retornam erro de configuração. Não coloque valores reais em `.dev.vars.example`, arquivos versionados, logs ou no bundle do app.
 
-### Liberar a tela de Cloud Sync em desenvolvimento
+## App local com Cloud Sync remoto
 
-Para testar com a identidade Google real sem criar uma transação, inicie o Worker localmente com:
+Para desenvolver o app Android usando um Worker e D1 remotos de staging, crie `.env.cloud` na raiz com as configurações públicas do app:
 
-```powershell
-npx wrangler dev --local --port 8788 --var "LOCAL_DEV_MODE:true" --var "ALLOWED_WEB_ORIGINS:http://localhost:8081,http://127.0.0.1:8081" --var "LOCAL_TEST_ENTITLEMENT_EMAILS:piblio10@gmail.com"
+```dotenv
+EXPO_PUBLIC_CLOUD_SYNC_API_URL=https://<worker-de-staging>
+EXPO_PUBLIC_GOOGLE_CLIENT_ID=<cliente-oauth-web>
+EXPO_PUBLIC_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=<numero-do-projeto>
 ```
 
-O usuário precisa concluir o login Google real. O servidor registra uma concessão de desenvolvimento para a identidade verificada, apenas se o e-mail estiver na lista permitida e a requisição for local. Essa concessão permite testar o Drive real; não é compra na Play e não libera acesso em um Worker remoto.
+Inicie o Expo com `npm run dev:cloud` (ou `npm run dev:cloud -- android`). O comando aceita somente as três configurações públicas mostradas acima, exige que estejam presentes e que a URL seja HTTPS, remota e sem credenciais embutidas. Os valores do arquivo prevalecem sobre valores herdados do terminal. Este modo não inicia nem publica o Worker e não ignora a validação de integridade. Use uma conta de teste: as operações de login e Drive são reais. `.env.cloud` é ignorado pelo Git; não coloque nele segredos do Worker.
+
+Na web, o app continua chamando `/api` na origem local do Expo. O proxy do Metro encaminha as requisições ao Worker de staging definido em `EXPO_PUBLIC_CLOUD_SYNC_API_URL`; o endereço físico do Worker é independente do endereço do frontend. O Android usa diretamente essa URL. No Worker remoto, autorize `http://localhost:8081` em `ALLOWED_WEB_ORIGINS` e configure a origem local no cliente OAuth Web. O proxy preserva `Origin`, credenciais e os cabeçalhos de sessão para as validações do Worker.
+
+### Testar o acesso ao Cloud Sync
+
+O Worker não concede acesso de desenvolvimento por lista de e-mails nem cria sessões de teste. Para testar o fluxo completo de sincronização, use uma conta de teste com uma compra válida no Worker de staging. O Worker local continua útil para validar inicialização, origem autorizada e chamadas HTTP sem acessar os serviços externos.
 
 ## Credenciais para habilitar os fluxos
 
@@ -31,7 +39,7 @@ O usuário precisa concluir o login Google real. O servidor registra uma concess
 - **Play Integrity:** vincule o app e a API Integrity ao projeto Cloud usado pela Play. Configure o número do projeto em `EXPO_PUBLIC_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER` no build Android e permita à conta de serviço do Worker decodificar os tokens. O app calcula um hash da chamada; o Worker pede à Google a validação do token e verifica pacote, hash, reconhecimento da instalação e integridade do dispositivo.
 - **Reembolsos:** configure notificações em tempo real do Google Play (RTDN) para Pub/Sub, com autenticação OIDC. Cadastre o tópico/audiência em `PLAY_RTDN_OIDC_AUDIENCE` e a conta de serviço em `PLAY_RTDN_SERVICE_ACCOUNT_EMAIL`. O Worker também revalida compras por tarefa agendada.
 
-Use `wrangler secret put NOME` para cadastrar segredos em um ambiente remoto somente quando a conta e o ambiente estiverem preparados. Este trabalho não publica o Worker nem altera a Play Console.
+Use `wrangler secret put NOME --env staging` para cadastrar segredos no ambiente remoto. O ambiente `staging` em `wrangler.jsonc` usa banco separado e serve também o frontend compilado em `dist`; `npm run deploy:staging` compila e publica ambos. Configure as origens OAuth e as permissões de compras e Integrity antes de considerar o teste interno pronto. O webhook RTDN permanece fechado enquanto audiência e identidade não estiverem configuradas; a revalidação agendada continua ativa.
 
 ## O que os arquivos sincronizados aceitam
 
@@ -48,4 +56,3 @@ O app só enumera os arquivos que foram criados na pasta própria e marcados com
 - **OIDC**: OpenID Connect, usado para autenticar a chamada Pub/Sub ao webhook.
 - **RTDN**: notificações em tempo real do Google Play.
 - **URI**: identificador de recurso, como um endereço de arquivo.
-
