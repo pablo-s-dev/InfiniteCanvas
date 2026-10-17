@@ -81,7 +81,7 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
             setLoading(false);
         }
     };
-    const { conflictAction, verifiedConflictIds, foreignDrawingIds, copyToCurrentAccount, account, accountStatus, entitlementStatus, busy, syncError, mainAction, signOut, inspection, inspectConflict, conflictBusy, conflictError, clearConflictError, syncState, syncMessage, cloudSyncPurchaseStatus, billingReady, cloudSyncPaywallOpen, setCloudSyncPaywallOpen, billingBusy, billingAction, billingFeedback, hasCloudSyncAccess, openCloudSyncPaywall, connectDrive, syncLocalDrawings, syncDrawing, resolveConflict, buyCloudSync, restoreCloudSyncPurchase } = useCloudSync({ drawings, loading, language, loadDrawings, setToast,
+    const { conflictAction, verifiedConflictIds, foreignDrawingIds, copyToCurrentAccount, account, accountStatus, entitlementStatus, busy, syncError, mainAction, signOut, inspection, inspectConflict, conflictBusy, conflictError, clearConflictError, syncState, syncConfirmed, syncMessage, cloudSyncPurchaseStatus, billingReady, cloudSyncPaywallOpen, setCloudSyncPaywallOpen, billingBusy, billingAction, billingFeedback, hasCloudSyncAccess, openCloudSyncPaywall, connectDrive, syncLocalDrawings, syncDrawing, resolveConflict, buyCloudSync, restoreCloudSyncPurchase } = useCloudSync({ drawings, loading, language, loadDrawings, setToast,
         onConflictResolved: () => setConflictDrawing(null) });
     useEffect(() => {
         loadDrawings();
@@ -462,7 +462,7 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
           {(busy || accountStatus === "checking") && <ActivityIndicator color={theme.primary}/>}
           <Text style={styles.inlineStatusText}>{syncStatusLabel}</Text>
         </View>
-        <SyncSummary unsyncedCount={unsyncedCount} theme={theme} labels={t} styles={styles} />
+        <SyncSummary connected={!!account && accountStatus === "connected"} confirmed={syncConfirmed && !loading} unsyncedCount={unsyncedCount} theme={theme} labels={t} styles={styles} />
         <Pressable accessibilityLabel={syncButtonLabel} disabled={busy || accountStatus === "checking"} style={[
             styles.primaryButtonWide, (busy || accountStatus === "checking") && styles.primaryButtonWideDisabled,
         ]} onPress={mainAction} {...webTitle(syncButtonLabel)}>

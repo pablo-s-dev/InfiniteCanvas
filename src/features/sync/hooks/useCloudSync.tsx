@@ -38,6 +38,8 @@ function useCloudSyncController() {
   const [resolvedVersion, setResolvedVersion] = useState(0);
   const [repositoryVersion, setRepositoryVersion] = useState(0);
   const [foreignDrawingIds, setForeignDrawingIds] = useState<string[]>([]);
+  // A restored session or old local metadata cannot confirm the current cloud state.
+  const [confirmedSyncBinding, setConfirmedSyncBinding] = useState<string | null>(null);
   const generation = useRef(0);
   const conflictGeneration = useRef(0);
   const operation = useRef<Promise<void> | null>(null);
@@ -63,12 +65,14 @@ function useCloudSyncController() {
     return t.googleDriveSyncFailed;
   };
   const applyAccount = (next: CloudSyncAccount) => {
+    if (accountRef.current?.accountBinding !== next.accountBinding) setConfirmedSyncBinding(null);
     accountRef.current = next; setAccount(next); setAccountStatus("connected");
     setEntitlementStatus(next.entitlement.active === null ? "error" : next.entitlement.active ? "active" : next.entitlement.status === "pending" ? "pending" : "inactive");
     if (next.entitlement.active) setCloudSyncPaywallOpen(false);
   };
   const handleError = (error: unknown) => {
     if (error instanceof CloudSyncApiError && error.code === "account_changed") return;
+    setConfirmedSyncBinding(null);
     if (__DEV__ && Platform.OS === "android") {
       const diagnostic: CloudSyncDiagnostic = error instanceof CloudSyncApiError
         ? error.diagnostic ?? {stage: "cloud_sync", code: error.code, status: error.status}
@@ -106,6 +110,7 @@ function useCloudSyncController() {
     operation.current = task; return task;
   };
   async function performSync(onlyDrawingId?: string) {
+    setConfirmedSyncBinding(null);
     localEditsPending.current = false;
     const next = await checkAccount(); if (!next) return;
     if (!next.entitlement.active || next.drive !== "ready") return;
@@ -114,6 +119,10 @@ function useCloudSyncController() {
     const documents = await drawingRepository.listIncludingDeleted(); guard();
     setVerifiedConflictIds(documents.filter(drawing => drawing.syncConflict).map(drawing => drawing.id));
     setSyncError(result.failures ? t.cloudSyncPartialFailure : null);
+    // A per-drawing sync does not prove that the whole library was checked.
+    if (!onlyDrawingId && !result.failures && !localEditsPending.current) {
+      setConfirmedSyncBinding(next.accountBinding);
+    }
   }
   const syncLocalDrawings = (options: {interactive?: boolean; silent?: boolean; onlyDrawingId?: string} = {}) => runOperation(() => performSync(options.onlyDrawingId));
   const connectDrive = async (_options: {syncAfterConnect?: boolean; prompt?: "" | "consent"; silent?: boolean; expectedAccountBinding?: string} = {}): Promise<boolean> => {
@@ -134,6 +143,7 @@ function useCloudSyncController() {
     return connected;
   };
   async function signOut() {
+    setConfirmedSyncBinding(null);
     generation.current += 1; conflictGeneration.current += 1;
     googleDriveSync.cancelPendingRequests(); operation.current = null;
     accountRef.current = null; setAccount(null); setAccountStatus("signed-out"); setEntitlementStatus("unknown"); setVerifiedConflictIds([]);
@@ -257,7 +267,7 @@ function useCloudSyncController() {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const unsubscribe = drawingRepository.subscribe(localEdit => {
       setRepositoryVersion(value => value + 1);
-      if (localEdit) {localEditsPending.current = true; clearTimeout(timer); timer = setTimeout(() => {if (accountRef.current?.entitlement.active) void latestSync.current({interactive: false});}, 1200);}
+      if (localEdit) {setConfirmedSyncBinding(null); localEditsPending.current = true; clearTimeout(timer); timer = setTimeout(() => {if (accountRef.current?.entitlement.active) void latestSync.current({interactive: false});}, 1200);}
     });
     const interval = setInterval(() => {if (accountRef.current?.entitlement.active) void latestSync.current({interactive: false});}, 60000);
     const online = () => {if (accountRef.current) void latestSync.current({interactive: false});};
@@ -265,6 +275,8 @@ function useCloudSyncController() {
     return () => {mounted.current = false; generation.current += 1; unsubscribe(); clearTimeout(timer); clearInterval(interval); if (Platform.OS === "web") window.removeEventListener("online", online);};
   }, []);
   const hasCloudSyncAccess = entitlementStatus === "active";
+  const syncConfirmed = !!account && confirmedSyncBinding === account.accountBinding &&
+    accountStatus === "connected" && hasCloudSyncAccess && account.drive === "ready" && !busy && !syncError;
   const syncState: SyncState = busy ? {status: "syncing"} : accountStatus === "connected" ? {status: "ready", email: account?.email} : {status: "signed-out"};
   const mainAction = () => {
     if (!accountRef.current || accountStatus === "expired") return void connectDrive();
@@ -275,7 +287,7 @@ function useCloudSyncController() {
   return {conflictAction: () => {if (!googleDriveSync.isReady()) void connectDrive({expectedAccountBinding: inspection?.accountBinding}); else mainAction();}, verifiedConflictIds, foreignDrawingIds, copyToCurrentAccount, language, setLanguage, account, accountStatus, entitlementStatus, busy, syncError, mainAction, signOut,
     conflictBusy, conflictError, inspection, inspectConflict, resolvedVersion, repositoryVersion,
     clearConflictError: () => {conflictGeneration.current += 1; setConflictError(null); setInspection(null); setConflictBusy(false);},
-    syncState, syncMessage, cloudSyncPurchaseStatus, billingReady, cloudSyncPaywallOpen, setCloudSyncPaywallOpen,
+    syncState, syncConfirmed, syncMessage, cloudSyncPurchaseStatus, billingReady, cloudSyncPaywallOpen, setCloudSyncPaywallOpen,
     billingBusy, billingAction, billingFeedback, hasCloudSyncAccess, openCloudSyncPaywall, connectDrive,
     syncLocalDrawings, syncDrawing: (drawing: DrawingSummary) => syncLocalDrawings({onlyDrawingId: drawing.id}),
     resolveConflict, buyCloudSync: () => purchase(false), restoreCloudSyncPurchase: () => purchase(true)};

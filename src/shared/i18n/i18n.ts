@@ -65,7 +65,8 @@ const dictionary = {
 
     syncSummaryUnsyncedMany: "{count} drawings not synced",
 
-    syncSummaryAllSynced: "All drawings are synced",
+    syncSummaryAllSynced: "Everything is synced",
+    syncSummaryLocal: "Drawings saved on this device",
 
     search: "Search drawings or tags",
 
@@ -390,7 +391,8 @@ const dictionary = {
 
     syncSummaryUnsyncedMany: "{count} desenhos não sincronizados",
 
-    syncSummaryAllSynced: "Todos os desenhos estão sincronizados",
+    syncSummaryAllSynced: "Tudo sincronizado",
+    syncSummaryLocal: "Desenhos salvos neste dispositivo",
 
     search: "Buscar desenhos ou tags",
 
@@ -723,7 +725,8 @@ const dictionary = {
 
     syncSummaryUnsyncedMany: "{count} dibujos sin sincronizar",
 
-    syncSummaryAllSynced: "Todos los dibujos están sincronizados",
+    syncSummaryAllSynced: "Todo sincronizado",
+    syncSummaryLocal: "Dibujos guardados en este dispositivo",
 
     search: "Buscar dibujos o etiquetas",
 

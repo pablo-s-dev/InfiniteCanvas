@@ -1,5 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { countUnsyncedDrawings } from "./syncSummary";
+import { countUnsyncedDrawings, getSyncSummaryState } from "./syncSummary";
+
+describe("getSyncSummaryState", () => {
+  it("never claims cloud sync while disconnected, even with stale confirmation", () => {
+    expect(getSyncSummaryState(false, false, 0)).toBe("local");
+    expect(getSyncSummaryState(false, true, 0)).toBe("local");
+    expect(getSyncSummaryState(false, true, 4)).toBe("local");
+  });
+  it("requires a successful confirmation and no pending drawings", () => {
+    expect(getSyncSummaryState(true, false, 0)).toBe("local");
+    expect(getSyncSummaryState(true, true, 0)).toBe("synced");
+    expect(getSyncSummaryState(true, false, 1)).toBe("pending");
+    expect(getSyncSummaryState(true, true, 3)).toBe("pending");
+  });
+});
 
 describe("countUnsyncedDrawings", () => {
   it("counts local, pending, failed, conflicted, and other-account drawings once each", () => {
