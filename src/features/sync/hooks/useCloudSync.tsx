@@ -10,7 +10,7 @@ import { cloudSyncBilling, type CloudSyncPurchaseStatus } from "../cloudSyncBill
 import { runCloudSync, assertSyncAccount, withSyncLock, uploadSnapshot, deleteSnapshot, adoptRemote } from "../syncEngine";
 import { compareSyncVersions, syncContentHash } from "../syncContent";
 import { syncBindings } from "../syncBindings";
-import { unverifiedDrawingIds } from "../syncOwnership";
+import { hasPendingDrawingState, unverifiedDrawingIds } from "../syncOwnership";
 
 type AccountStatus = "checking" | "signed-out" | "signing-in" | "connected" | "expired";
 type EntitlementStatus = "unknown" | "checking" | "active" | "inactive" | "pending" | "error";
@@ -125,7 +125,8 @@ function useCloudSyncController() {
     setVerifiedConflictIds(documents.filter(drawing => drawing.syncConflict).map(drawing => drawing.id));
     setSyncError(result.failures ? t.cloudSyncPartialFailure : null);
     // A per-drawing sync does not prove that the whole library was checked.
-    if (!onlyDrawingId && !result.failures && !unconfirmed.length && !localEditsPending.current) {
+    if (!onlyDrawingId && !result.failures && !unconfirmed.length &&
+      !hasPendingDrawingState(documents) && !localEditsPending.current) {
       setConfirmedSyncBinding(next.accountBinding);
     }
   }
