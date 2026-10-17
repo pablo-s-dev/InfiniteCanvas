@@ -354,7 +354,7 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
                 </View>
                 <Text style={styles.emptyTitle}>{t.noDrawings}</Text>
                 <Text style={styles.emptyText}>{t.noDrawingsBody}</Text>
-                <Pressable style={styles.emptyButton} onPress={startNewDrawing} {...webTitle(t.createDrawing)}>
+                <Pressable accessibilityRole="button" accessibilityLabel={t.createDrawing} style={styles.emptyButton} onPress={startNewDrawing} {...webTitle(t.createDrawing)}>
                   <AppIcon icon="mdi:plus" size={20} color={theme.primaryText}/>
                   <Text style={styles.emptyButtonText}>{t.createDrawing}</Text>
                 </Pressable>
