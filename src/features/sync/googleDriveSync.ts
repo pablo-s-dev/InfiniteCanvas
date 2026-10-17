@@ -78,9 +78,21 @@ type ApiErrorPayload = {
   error?: { code?: string; message?: string };
 };
 
-function logCloudSyncDiagnostic(diagnostic: CloudSyncDiagnostic): CloudSyncDiagnostic {
-  if (__DEV__ && Platform.OS === "android") {
-    console.warn(`[CloudSync] ${JSON.stringify(diagnostic)}`);
+// Keep diagnostics useful without logging authorization codes, tokens, headers,
+// request bodies, or server response bodies.
+function debugErrorDetails(error: unknown): { name: string; message: string; stack?: string } {
+  if (error instanceof Error) {
+    return { name: error.name, message: error.message, stack: error.stack };
+  }
+  return { name: typeof error, message: "A non-Error value was thrown." };
+}
+
+function logCloudSyncDiagnostic(diagnostic: CloudSyncDiagnostic, error?: unknown): CloudSyncDiagnostic {
+  if (__DEV__) {
+    console.warn("[CloudSync]", {
+      ...diagnostic,
+      ...(error === undefined ? {} : { originalError: debugErrorDetails(error) }),
+    });
   }
   return diagnostic;
 }
@@ -579,7 +591,7 @@ export class GoogleDriveSync {
       const native = await this.loadNativeGoogleSignIn().catch(() => null);
       if (native?.isErrorWithCode(error)) {
         const { statusCodes } = native;
-        const diagnostic = logCloudSyncDiagnostic({ stage, code: error.code });
+        const diagnostic = logCloudSyncDiagnostic({ stage, code: error.code }, error);
         this.state = {
           status: "error",
           code: error.code,
@@ -603,7 +615,7 @@ export class GoogleDriveSync {
             ? error.name
             : "unknown_error",
         ...(error instanceof CloudSyncApiError ? { status: error.status } : {}),
-      });
+      }, error);
       this.state = {
         status: "error",
         code: error instanceof CloudSyncApiError ? error.code : undefined,
@@ -779,28 +791,59 @@ export class GoogleDriveSync {
     if (generation !== this.sessionGeneration) throw new CloudSyncApiError("The account changed.", "account_changed", 409);
     const controller = new AbortController();
     this.activeRequests.add(controller);
+    const requestStartedAt = Date.now();
     const timeout = setTimeout(() => controller.abort(), 45_000);
     let response: Response;
     let responseText: string;
     try {
-    response = await fetch(url, {
-      signal: controller.signal,
-      credentials: Platform.OS === "web" ? "include" : "omit",
-      method,
-      headers,
-      ...(body === undefined ? {} : { body: bodyText }),
-    });
-    responseText = await response.text();
+      response = await fetch(url, {
+        signal: controller.signal,
+        credentials: Platform.OS === "web" ? "include" : "omit",
+        method,
+        headers,
+        ...(body === undefined ? {} : { body: bodyText }),
+      });
+      responseText = await response.text();
     } catch (error) {
-      if (generation !== this.sessionGeneration) throw new CloudSyncApiError("The account changed.", "account_changed", 409);
-      throw new CloudSyncApiError("The sync service could not be reached.", controller.signal.aborted ? "request_timeout" : "network_unavailable", 503);
-    } finally { clearTimeout(timeout); this.activeRequests.delete(controller); }
+      if (generation !== this.sessionGeneration) {
+        throw new CloudSyncApiError("The account changed.", "account_changed", 409);
+      }
+      if (__DEV__) {
+        console.error("[CloudSync HTTP] Transport failure", {
+          method,
+          url: `${url.origin}${url.pathname}`,
+          elapsedMs: Date.now() - requestStartedAt,
+          timedOut: controller.signal.aborted,
+          originalError: debugErrorDetails(error),
+        });
+      }
+      const wrappedError = new CloudSyncApiError(
+        "The sync service could not be reached.",
+        controller.signal.aborted ? "request_timeout" : "network_unavailable",
+        503,
+      );
+      // Preserve the original error for callers that can inspect its cause.
+      (wrappedError as Error & { cause?: unknown }).cause = error;
+      throw wrappedError;
+    } finally {
+      clearTimeout(timeout);
+      this.activeRequests.delete(controller);
+    }
     if (generation !== this.sessionGeneration) throw new CloudSyncApiError("The account changed during this request.", "account_changed", 409);
     let payload: unknown = null;
     if (responseText) {
       try {
         payload = JSON.parse(responseText);
-      } catch {
+      } catch (error) {
+        if (__DEV__) {
+          console.error("[CloudSync HTTP] Invalid JSON response", {
+            method,
+            url: `${url.origin}${url.pathname}`,
+            status: response.status,
+            elapsedMs: Date.now() - requestStartedAt,
+            originalError: debugErrorDetails(error),
+          });
+        }
         throw new Error("Cloud Sync returned an invalid response.");
       }
     }
@@ -812,6 +855,19 @@ export class GoogleDriveSync {
       const message = typeof error?.message === "string"
         ? error.message
         : "Cloud Sync could not complete the request.";
+      if (__DEV__) {
+        const expectedSignedOut = response.status === 401 &&
+          ["session_required", "session_expired"].includes(code);
+        const diagnostic = {
+          method,
+          url: `${url.origin}${url.pathname}`,
+          status: response.status,
+          code,
+          elapsedMs: Date.now() - requestStartedAt,
+        };
+        if (expectedSignedOut) console.info("[CloudSync HTTP] Authentication required", diagnostic);
+        else console.warn("[CloudSync HTTP] API rejected request", diagnostic);
+      }
       if (response.status === 401 && ["session_required", "session_expired"].includes(code) && !options.tolerateUnauthorized) {
         await this.clearLocalSession();
         this.state = { status: "signed-out" };
