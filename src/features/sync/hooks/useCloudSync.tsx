@@ -10,6 +10,7 @@ import { cloudSyncBilling, type CloudSyncPurchaseStatus } from "../cloudSyncBill
 import { runCloudSync, assertSyncAccount, withSyncLock, uploadSnapshot, deleteSnapshot, adoptRemote } from "../syncEngine";
 import { compareSyncVersions, syncContentHash } from "../syncContent";
 import { syncBindings } from "../syncBindings";
+import { unverifiedDrawingIds } from "../syncOwnership";
 
 type AccountStatus = "checking" | "signed-out" | "signing-in" | "connected" | "expired";
 type EntitlementStatus = "unknown" | "checking" | "active" | "inactive" | "pending" | "error";
@@ -38,6 +39,7 @@ function useCloudSyncController() {
   const [resolvedVersion, setResolvedVersion] = useState(0);
   const [repositoryVersion, setRepositoryVersion] = useState(0);
   const [foreignDrawingIds, setForeignDrawingIds] = useState<string[]>([]);
+  const [unconfirmedDrawingIds, setUnconfirmedDrawingIds] = useState<string[]>([]);
   // A restored session or old local metadata cannot confirm the current cloud state.
   const [confirmedSyncBinding, setConfirmedSyncBinding] = useState<string | null>(null);
   const generation = useRef(0);
@@ -117,10 +119,13 @@ function useCloudSyncController() {
     const guard = guardFor(next.accountBinding); setSyncMessage(t.syncingDrawings);
     const result = await runCloudSync(next, guard, onlyDrawingId); guard();
     const documents = await drawingRepository.listIncludingDeleted(); guard();
+    const bindings = await syncBindings.list(); guard();
+    const unconfirmed = unverifiedDrawingIds(documents, bindings, next.accountBinding);
+    setUnconfirmedDrawingIds(unconfirmed);
     setVerifiedConflictIds(documents.filter(drawing => drawing.syncConflict).map(drawing => drawing.id));
     setSyncError(result.failures ? t.cloudSyncPartialFailure : null);
     // A per-drawing sync does not prove that the whole library was checked.
-    if (!onlyDrawingId && !result.failures && !localEditsPending.current) {
+    if (!onlyDrawingId && !result.failures && !unconfirmed.length && !localEditsPending.current) {
       setConfirmedSyncBinding(next.accountBinding);
     }
   }
@@ -243,10 +248,11 @@ function useCloudSyncController() {
   }
   useEffect(() => {
     let canceled = false;
-    void syncBindings.list().then((bindings) => {
+    void Promise.all([syncBindings.list(), drawingRepository.listIncludingDeleted()]).then(([bindings, documents]) => {
       if (canceled) return;
       const foreign = new Set(bindings.filter(binding => account && binding.accountBinding !== account.accountBinding).map(binding => binding.drawingId));
       setForeignDrawingIds([...foreign]);
+      setUnconfirmedDrawingIds(unverifiedDrawingIds(documents, bindings, account?.accountBinding));
     });
     return () => {canceled = true;};
   }, [repositoryVersion, account?.accountBinding]);
@@ -284,7 +290,7 @@ function useCloudSyncController() {
     if (accountRef.current.drive === "reauthorization-required") return void connectDrive();
     void syncLocalDrawings();
   };
-  return {conflictAction: () => {if (!googleDriveSync.isReady()) void connectDrive({expectedAccountBinding: inspection?.accountBinding}); else mainAction();}, verifiedConflictIds, foreignDrawingIds, copyToCurrentAccount, language, setLanguage, account, accountStatus, entitlementStatus, busy, syncError, mainAction, signOut,
+  return {conflictAction: () => {if (!googleDriveSync.isReady()) void connectDrive({expectedAccountBinding: inspection?.accountBinding}); else mainAction();}, verifiedConflictIds, foreignDrawingIds, unconfirmedDrawingIds, copyToCurrentAccount, language, setLanguage, account, accountStatus, entitlementStatus, busy, syncError, mainAction, signOut,
     conflictBusy, conflictError, inspection, inspectConflict, resolvedVersion, repositoryVersion,
     clearConflictError: () => {conflictGeneration.current += 1; setConflictError(null); setInspection(null); setConflictBusy(false);},
     syncState, syncConfirmed, syncMessage, cloudSyncPurchaseStatus, billingReady, cloudSyncPaywallOpen, setCloudSyncPaywallOpen,
