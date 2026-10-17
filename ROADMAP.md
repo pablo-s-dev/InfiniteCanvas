@@ -195,8 +195,8 @@ Do this after tests exist, because these changes can affect UI behavior.
 
 Done:
 
-- `android:apk`
-- `android:apk:arm64`
+- `build:android:apk`
+- `build:android:apk -- arm64-v8a`
 - `doctor`
 - `verify`
 - `verify` now runs typecheck, Vitest, and Expo Doctor without failing on the
