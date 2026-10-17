@@ -26,6 +26,12 @@ const additionalBlockList = generatedOrLocalDirectories.map((directory) => {
   );
 });
 
+// Native builds create large trees inside dependencies too. Watching these
+// caches can exceed Metro's startup timeout while Gradle is compiling.
+additionalBlockList.push(new RegExp(
+  `^${rootPattern}[\\\\/]node_modules[\\\\/].*[\\\\/](?:android|ReactAndroid)[\\\\/](?:build|\\.cxx|\\.gradle|\\.kotlin)(?:[\\\\/]|$)`,
+));
+
 const existingBlockList = config.resolver.blockList;
 config.resolver.blockList = [
   ...(Array.isArray(existingBlockList)
