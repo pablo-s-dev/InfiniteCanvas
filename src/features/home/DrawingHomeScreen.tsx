@@ -81,7 +81,7 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
             setLoading(false);
         }
     };
-    const { conflictAction, verifiedConflictIds, foreignDrawingIds, copyToCurrentAccount, account, accountStatus, entitlementStatus, busy, syncError, mainAction, signOut, inspection, inspectConflict, conflictBusy, conflictError, clearConflictError, syncState, syncConfirmed, syncMessage, cloudSyncPurchaseStatus, billingReady, cloudSyncPaywallOpen, setCloudSyncPaywallOpen, billingBusy, billingAction, billingFeedback, hasCloudSyncAccess, openCloudSyncPaywall, connectDrive, syncLocalDrawings, syncDrawing, resolveConflict, buyCloudSync, restoreCloudSyncPurchase } = useCloudSync({ drawings, loading, language, loadDrawings, setToast,
+    const { conflictAction, verifiedConflictIds, foreignDrawingIds, unconfirmedDrawingIds, copyToCurrentAccount, account, accountStatus, entitlementStatus, busy, syncError, mainAction, signOut, inspection, inspectConflict, conflictBusy, conflictError, clearConflictError, syncState, syncConfirmed, syncMessage, cloudSyncPurchaseStatus, billingReady, cloudSyncPaywallOpen, setCloudSyncPaywallOpen, billingBusy, billingAction, billingFeedback, hasCloudSyncAccess, openCloudSyncPaywall, connectDrive, syncLocalDrawings, syncDrawing, resolveConflict, buyCloudSync, restoreCloudSyncPurchase } = useCloudSync({ drawings, loading, language, loadDrawings, setToast,
         onConflictResolved: () => setConflictDrawing(null) });
     useEffect(() => {
         loadDrawings();
@@ -97,7 +97,7 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
         const drawingTags = drawings.flatMap((drawing) => drawing.flatTags);
         return Array.from(new Set([...customTags, ...drawingTags])).sort((a, b) => a.localeCompare(b));
     }, [customTags, drawings]);
-    const unsyncedCount = countUnsyncedDrawings(drawings, foreignDrawingIds);
+    const unsyncedCount = countUnsyncedDrawings(drawings, unconfirmedDrawingIds);
     const filteredDrawings = useMemo(() => {
         const normalizedQuery = queryParams.query.trim().toLowerCase();
         const matches = drawings.filter((drawing) => {
