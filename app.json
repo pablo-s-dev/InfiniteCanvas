@@ -2,7 +2,7 @@
   "expo": {
     "name": "Infinite Canvas",
     "slug": "InfiniteCanvas",
-    "version": "1.1.0-alpha.9",
+    "version": "1.1.0-alpha.10",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -13,7 +13,7 @@
       "supportsTablet": true
     },
     "android": {
-      "versionCode": 137,
+      "versionCode": 138,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"

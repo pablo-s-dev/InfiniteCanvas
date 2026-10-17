@@ -103,8 +103,8 @@ android {
         applicationId 'com.PabloS.InfiniteCanvas'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 137
-        versionName "1.1.0-alpha.9"
+        versionCode 138
+        versionName "1.1.0-alpha.10"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
