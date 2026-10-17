@@ -36,4 +36,8 @@ describe("countUnsyncedDrawings", () => {
     ], [])).toBe(0);
     expect(countUnsyncedDrawings([], [])).toBe(0);
   });
+
+  it("treats missing sync metadata as unconfirmed even if a Drive id exists", () => {
+    expect(countUnsyncedDrawings([{ id: "unknown", driveFileId: "drive-unknown" }], [])).toBe(1);
+  });
 });
