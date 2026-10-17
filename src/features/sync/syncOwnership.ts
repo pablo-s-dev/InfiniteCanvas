@@ -1,4 +1,10 @@
 import type { SyncBinding } from "./syncBindings";
+import type { DrawingSummary } from "../documents/drawingRepository";
+
+export function hasPendingDrawingState(drawings: readonly Pick<DrawingSummary, "deletedAt" | "syncStatus" | "driveFileId" | "syncConflict">[]) {
+  return drawings.some(drawing => !drawing.deletedAt &&
+    (drawing.syncStatus !== "synced" || !drawing.driveFileId || drawing.syncConflict === true));
+}
 
 // Legacy Drive ids do not establish which Google account owns a drawing.
 export function unverifiedDrawingIds(
