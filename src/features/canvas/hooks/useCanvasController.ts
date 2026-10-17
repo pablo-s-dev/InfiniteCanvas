@@ -129,6 +129,8 @@ export function useCanvasController({ localDrawingId, onCanvasDataChange, canvas
         return [touchPoint.locationX, touchPoint.locationY];
     };
     const [onlyPanningMode, setPanningGesture] = useState<boolean>(false);
+    const [middlePanning, setMiddlePanning] = useState(false);
+    const middlePanRef = useRef<{pointerId?: number; target: HTMLElement; position: [number, number]} | null>(null);
     const [shouldBlockDrawing, setShouldBlockDrawing] = useState<boolean>(false);
     const [canvasPreferences, setCanvasPreferences] = useState<CanvasPreferences>({
         pencilDrawsFingerPans: false,
@@ -1401,25 +1403,61 @@ export function useCanvasController({ localDrawingId, onCanvasDataChange, canvas
         e.preventDefault();
         e.stopPropagation();
     };
-    const checkMiddleButtonDown = (e: any) => {
-        if (e.button === 1 && Platform.OS === "web") {
-            e.preventDefault();
-            setPanningGesture(true);
-            // change icon of the cursor
-            document.body.style.cursor = "grabbing";
-        }
+    const startMiddlePan = (event: any) => {
+        const nativeEvent = event.nativeEvent ?? event;
+        const target = canvasRef.current as unknown as HTMLElement | null;
+        if (Platform.OS !== "web" || nativeEvent.button !== 1 ||
+            !target?.contains(nativeEvent.target ?? event.target)) return false;
+        event.preventDefault?.();
+        event.stopPropagation?.();
+        if (middlePanRef.current) return true;
+        middlePanRef.current = {
+            pointerId: nativeEvent.pointerId,
+            target,
+            position: [nativeEvent.clientX, nativeEvent.clientY],
+        };
+        if (nativeEvent.pointerId != null) target.setPointerCapture?.(nativeEvent.pointerId);
+        setCanvasContextMenu(null);
+        setMiddlePanning(true);
+        return true;
     };
-    const checkMiddleButtonUp = (e: any) => {
-        if (e.button === 1 && Platform.OS === "web") {
-            setPanningGesture(false);
-            // change icon of the cursor
-            document.body.style.cursor = "default";
+    const finishMiddlePan = (event?: any) => {
+        const gesture = middlePanRef.current;
+        const nativeEvent = event?.nativeEvent ?? event;
+        if (!gesture || (nativeEvent?.pointerId != null && gesture.pointerId != null &&
+            nativeEvent.pointerId !== gesture.pointerId)) return false;
+        middlePanRef.current = null;
+        setMiddlePanning(false);
+        if (gesture.pointerId != null && gesture.target.hasPointerCapture?.(gesture.pointerId)) {
+            gesture.target.releasePointerCapture(gesture.pointerId);
         }
+        return true;
     };
+    const checkMiddleButtonUp = (event: MouseEvent) => {
+        if (event.button === 1) finishMiddlePan();
+    };
+    const cancelMiddlePan = () => { finishMiddlePan(); };
     const handlePointerMoveSvg = (e: any) => {
         if (Platform.OS === "web") {
+            const nativeEvent = e.nativeEvent ?? e;
             const position = getWebPointerPosition(e);
             updateCursorCoordinates(position);
+            const gesture = middlePanRef.current;
+            if (gesture) {
+                if ((nativeEvent.buttons & 4) === 0) {
+                    finishMiddlePan(e);
+                    return;
+                }
+                if (gesture.pointerId != null && nativeEvent.pointerId !== gesture.pointerId) return;
+                e.preventDefault?.();
+                e.stopPropagation?.();
+                const nextPosition: [number, number] = [nativeEvent.clientX, nativeEvent.clientY];
+                const deltaX = getPanOffsetDelta(nextPosition[0] - gesture.position[0], scale);
+                const deltaY = getPanOffsetDelta(nextPosition[1] - gesture.position[1], scale);
+                gesture.position = nextPosition;
+                setPanningOffset(prev => [prev[0] + deltaX, prev[1] + deltaY]);
+                return;
+            }
             if (eraserMode) {
                 const node = e.currentTarget ?? e.nativeEvent?.target;
                 const rect = node?.getBoundingClientRect?.();
@@ -1429,15 +1467,6 @@ export function useCanvasController({ localDrawingId, onCanvasDataChange, canvas
                     : false;
                 queueEraserTrailPoint(position[0], position[1], isHovering);
             }
-        }
-        const isPressingMiddleBtn = e.buttons === 4;
-        if (isPressingMiddleBtn) {
-            setPanningGesture(true);
-            const deltaX = getPanOffsetDelta(e.movementX, scale);
-            const deltaY = getPanOffsetDelta(e.movementY, scale);
-            setPanningOffset((prev) => [prev[0] + deltaX, prev[1] + deltaY]);
-            // e.preventDefault();
-            // e.stopPropagation();
         }
     };
     const getWebPointerPosition = (e: any): [
@@ -1721,6 +1750,7 @@ export function useCanvasController({ localDrawingId, onCanvasDataChange, canvas
         }
     };
     const handleConfiguredPointerMove = (e: any) => {
+        if (middlePanRef.current) return;
         const nativeEvent = e.nativeEvent ?? e;
         if (nativeTwoFingerGestureActiveRef.current &&
             nativeEvent.pointerType === "touch") {
@@ -1968,8 +1998,11 @@ export function useCanvasController({ localDrawingId, onCanvasDataChange, canvas
                 type: "READY",
                 protocolVersion: CANVAS_EMBED_PROTOCOL_VERSION,
             });
-            document.addEventListener("mousedown", checkMiddleButtonDown);
+            document.addEventListener("pointerdown", startMiddlePan, true);
+            document.addEventListener("mousedown", startMiddlePan, true);
             document.addEventListener("mouseup", checkMiddleButtonUp);
+            document.addEventListener("pointercancel", finishMiddlePan);
+            window.addEventListener("blur", cancelMiddlePan);
             document.addEventListener("wheel", handleWheel, { passive: false });
             document.addEventListener("touchmove", preventScrollingParent, {
                 passive: false,
@@ -2032,8 +2065,16 @@ export function useCanvasController({ localDrawingId, onCanvasDataChange, canvas
             document.removeEventListener("touchmove", preventScrollingParent);
             document.removeEventListener("gesturestart", preventScrollingParent);
             document.removeEventListener("scroll", preventScrollingParent);
-            document.removeEventListener("mousedown", checkMiddleButtonDown);
+            document.removeEventListener("pointerdown", startMiddlePan, true);
+            document.removeEventListener("mousedown", startMiddlePan, true);
             document.removeEventListener("mouseup", checkMiddleButtonUp);
+            document.removeEventListener("pointercancel", finishMiddlePan);
+            window.removeEventListener("blur", cancelMiddlePan);
+            const gesture = middlePanRef.current;
+            middlePanRef.current = null;
+            if (gesture?.pointerId != null && gesture.target.hasPointerCapture?.(gesture.pointerId)) {
+                gesture.target.releasePointerCapture(gesture.pointerId);
+            }
             document.removeEventListener("wheel", handleWheel);
             document.removeEventListener("keydown", ctrlZ_handler);
             document.removeEventListener("keydown", ctrlY_handler);
@@ -2065,7 +2106,9 @@ export function useCanvasController({ localDrawingId, onCanvasDataChange, canvas
     });
     const canvasCursor = Platform.OS !== "web"
         ? undefined
-        : isSelectionResizing
+        : middlePanning
+            ? "grabbing"
+            : isSelectionResizing
             ? "nwse-resize"
             : isSelectionDragging
                 ? "grabbing"
@@ -2084,7 +2127,7 @@ export function useCanvasController({ localDrawingId, onCanvasDataChange, canvas
                                 : "crosshair";
     const [windowHeight, setWindowHeight] = useState(Dimensions.get("window").height);
     const webCanvasEventProps = Platform.OS === "web"
-        ? ({ onContextMenu: openCanvasContextMenu } as any)
+        ? ({ onContextMenu: openCanvasContextMenu, onLostPointerCapture: finishMiddlePan } as any)
         : {};
     useEffect(() => {
         const updateHeight = () => {
@@ -2093,5 +2136,5 @@ export function useCanvasController({ localDrawingId, onCanvasDataChange, canvas
         const subscription = Dimensions.addEventListener("change", updateHeight);
         return () => subscription?.remove(); // Cleanup on unmount
     }, []);
-    return { selectedImageId, selectCanvasImage, updateCanvasImage, insertShapeAtCenter: (tool: Exclude<ShapeTool, "freehand">) => insertShapeAtCanvasPoint(insertionCenter(), tool), insertImageAtCenter: () => pickImageAtCanvasPoint(insertionCenter()), canvasBackgroundColor, buttonsContainerColor, curIdx, canvasItems, setCurIdx, windowHeight, canvasCursor, canvasRef, nativeTouchActiveRef, onTouchMoveSvg, onTouchStartSvg, onTouchEndSvg, cancelScribbleFreeze, nativeTwoFingerGestureActiveRef, prevFingersPos, prevTwoFingerDist, setShouldBlockDrawing, eraserMode, cancelEraserGesture, lassoMode, rectangleSelectionMode, finalizeLassoSelection, prepareForNextDrawing, isSelectionResizePointerEvent, selectedPathIndexes, clearSelection, startWebEraserPointer, handleConfiguredPointerStart, handlePointerMoveSvg, handleConfiguredPointerMove, finishWebEraserPointer, handleConfiguredPointerEnd, eraserPointerIdRef, getWebPointerPosition, queueEraserTrailPoint, webCanvasEventProps, onCanvasLayout, svgRef, x, y, scale, svgItems, pendingEraseItemIds, selectedBounds, lassoPath, eraserPreviewPath, eraserPreviewOpacity, strokeColorPreview, curPath, strokeWidth, imgItems, selectionScreenBounds, isSelectionDragging, isSelectionResizing, startSelectionDrag, moveSelectionDrag, endSelectionDrag, startSelectionResize, moveSelectionResize, endSelectionResize, duplicateSelectedPaths, deleteSelectedPaths, canvasContextMenu, pasteSelectionAtContextMenu, insertImageAtContextMenu, insertShapeAtContextMenu, setCanvasContextMenu, pseudoPointerMode, pointerHintVisible, pseudoLeftClick, canvasPointToScreenPoint, pseudoPointerPos, cursorCoordinates, setPseudoLeftClick, onlyPanningMode, setColorPickerModal, activateStrokeMode, activatePanMode, activatePointerMode, activateEraserMode, confirmWipeCanvas, resetViewportToContent, smoothingEnabled, setSmoothingEnabled, shapeTool, activateShapeTool, activateLassoMode, activateRectangleSelectionMode, eraserModeType, setEraserModeType, eraserSize, setEraserSize, setStrokeWidth, setStrokeColor, clearCanvasDialogOpen, setClearCanvasDialogOpen, wipeCanvas, customSwatches, onColorSelect, showColorPickerModal };
+    return { startMiddlePan, finishMiddlePan, selectedImageId, selectCanvasImage, updateCanvasImage, insertShapeAtCenter: (tool: Exclude<ShapeTool, "freehand">) => insertShapeAtCanvasPoint(insertionCenter(), tool), insertImageAtCenter: () => pickImageAtCanvasPoint(insertionCenter()), canvasBackgroundColor, buttonsContainerColor, curIdx, canvasItems, setCurIdx, windowHeight, canvasCursor, canvasRef, nativeTouchActiveRef, onTouchMoveSvg, onTouchStartSvg, onTouchEndSvg, cancelScribbleFreeze, nativeTwoFingerGestureActiveRef, prevFingersPos, prevTwoFingerDist, setShouldBlockDrawing, eraserMode, cancelEraserGesture, lassoMode, rectangleSelectionMode, finalizeLassoSelection, prepareForNextDrawing, isSelectionResizePointerEvent, selectedPathIndexes, clearSelection, startWebEraserPointer, handleConfiguredPointerStart, handlePointerMoveSvg, handleConfiguredPointerMove, finishWebEraserPointer, handleConfiguredPointerEnd, eraserPointerIdRef, getWebPointerPosition, queueEraserTrailPoint, webCanvasEventProps, onCanvasLayout, svgRef, x, y, scale, svgItems, pendingEraseItemIds, selectedBounds, lassoPath, eraserPreviewPath, eraserPreviewOpacity, strokeColorPreview, curPath, strokeWidth, imgItems, selectionScreenBounds, isSelectionDragging, isSelectionResizing, startSelectionDrag, moveSelectionDrag, endSelectionDrag, startSelectionResize, moveSelectionResize, endSelectionResize, duplicateSelectedPaths, deleteSelectedPaths, canvasContextMenu, pasteSelectionAtContextMenu, insertImageAtContextMenu, insertShapeAtContextMenu, setCanvasContextMenu, pseudoPointerMode, pointerHintVisible, pseudoLeftClick, canvasPointToScreenPoint, pseudoPointerPos, cursorCoordinates, setPseudoLeftClick, onlyPanningMode, setColorPickerModal, activateStrokeMode, activatePanMode, activatePointerMode, activateEraserMode, confirmWipeCanvas, resetViewportToContent, smoothingEnabled, setSmoothingEnabled, shapeTool, activateShapeTool, activateLassoMode, activateRectangleSelectionMode, eraserModeType, setEraserModeType, eraserSize, setEraserSize, setStrokeWidth, setStrokeColor, clearCanvasDialogOpen, setClearCanvasDialogOpen, wipeCanvas, customSwatches, onColorSelect, showColorPickerModal };
 }

@@ -15,7 +15,7 @@ import { CanvasColorPicker } from "./CanvasColorPicker";
 import { DraggableCanvasImage } from "./DraggableCanvasImage";
 import { CanvasHistoryControls } from "./CanvasHistoryControls";
 import type { useCanvasController } from "../hooks/useCanvasController";
-export function CanvasScene({ selectedImageId, selectCanvasImage, updateCanvasImage, insertShapeAtCenter, insertImageAtCenter, canvasBackgroundColor, buttonsContainerColor, curIdx, canvasItems, setCurIdx, windowHeight, canvasCursor, canvasRef, nativeTouchActiveRef, onTouchMoveSvg, onTouchStartSvg, onTouchEndSvg, cancelScribbleFreeze, nativeTwoFingerGestureActiveRef, prevFingersPos, prevTwoFingerDist, setShouldBlockDrawing, eraserMode, cancelEraserGesture, lassoMode, rectangleSelectionMode, finalizeLassoSelection, prepareForNextDrawing, isSelectionResizePointerEvent, selectedPathIndexes, clearSelection, startWebEraserPointer, handleConfiguredPointerStart, handlePointerMoveSvg, handleConfiguredPointerMove, finishWebEraserPointer, handleConfiguredPointerEnd, eraserPointerIdRef, getWebPointerPosition, queueEraserTrailPoint, webCanvasEventProps, onCanvasLayout, svgRef, x, y, scale, svgItems, pendingEraseItemIds, selectedBounds, lassoPath, eraserPreviewPath, eraserPreviewOpacity, strokeColorPreview, curPath, strokeWidth, imgItems, selectionScreenBounds, isSelectionDragging, isSelectionResizing, startSelectionDrag, moveSelectionDrag, endSelectionDrag, startSelectionResize, moveSelectionResize, endSelectionResize, duplicateSelectedPaths, deleteSelectedPaths, canvasContextMenu, pasteSelectionAtContextMenu, insertImageAtContextMenu, insertShapeAtContextMenu, setCanvasContextMenu, pseudoPointerMode, pointerHintVisible, pseudoLeftClick, canvasPointToScreenPoint, pseudoPointerPos, cursorCoordinates, setPseudoLeftClick, onlyPanningMode, setColorPickerModal, activateStrokeMode, activatePanMode, activatePointerMode, activateEraserMode, confirmWipeCanvas, resetViewportToContent, smoothingEnabled, setSmoothingEnabled, shapeTool, activateShapeTool, activateLassoMode, activateRectangleSelectionMode, eraserModeType, setEraserModeType, eraserSize, setEraserSize, setStrokeWidth, setStrokeColor, clearCanvasDialogOpen, setClearCanvasDialogOpen, wipeCanvas, customSwatches, onColorSelect, showColorPickerModal }: ReturnType<typeof useCanvasController>) {
+export function CanvasScene({ startMiddlePan, finishMiddlePan, selectedImageId, selectCanvasImage, updateCanvasImage, insertShapeAtCenter, insertImageAtCenter, canvasBackgroundColor, buttonsContainerColor, curIdx, canvasItems, setCurIdx, windowHeight, canvasCursor, canvasRef, nativeTouchActiveRef, onTouchMoveSvg, onTouchStartSvg, onTouchEndSvg, cancelScribbleFreeze, nativeTwoFingerGestureActiveRef, prevFingersPos, prevTwoFingerDist, setShouldBlockDrawing, eraserMode, cancelEraserGesture, lassoMode, rectangleSelectionMode, finalizeLassoSelection, prepareForNextDrawing, isSelectionResizePointerEvent, selectedPathIndexes, clearSelection, startWebEraserPointer, handleConfiguredPointerStart, handlePointerMoveSvg, handleConfiguredPointerMove, finishWebEraserPointer, handleConfiguredPointerEnd, eraserPointerIdRef, getWebPointerPosition, queueEraserTrailPoint, webCanvasEventProps, onCanvasLayout, svgRef, x, y, scale, svgItems, pendingEraseItemIds, selectedBounds, lassoPath, eraserPreviewPath, eraserPreviewOpacity, strokeColorPreview, curPath, strokeWidth, imgItems, selectionScreenBounds, isSelectionDragging, isSelectionResizing, startSelectionDrag, moveSelectionDrag, endSelectionDrag, startSelectionResize, moveSelectionResize, endSelectionResize, duplicateSelectedPaths, deleteSelectedPaths, canvasContextMenu, pasteSelectionAtContextMenu, insertImageAtContextMenu, insertShapeAtContextMenu, setCanvasContextMenu, pseudoPointerMode, pointerHintVisible, pseudoLeftClick, canvasPointToScreenPoint, pseudoPointerPos, cursorCoordinates, setPseudoLeftClick, onlyPanningMode, setColorPickerModal, activateStrokeMode, activatePanMode, activatePointerMode, activateEraserMode, confirmWipeCanvas, resetViewportToContent, smoothingEnabled, setSmoothingEnabled, shapeTool, activateShapeTool, activateLassoMode, activateRectangleSelectionMode, eraserModeType, setEraserModeType, eraserSize, setEraserSize, setStrokeWidth, setStrokeColor, clearCanvasDialogOpen, setClearCanvasDialogOpen, wipeCanvas, customSwatches, onColorSelect, showColorPickerModal }: ReturnType<typeof useCanvasController>) {
  const canvasToolTheme = useCanvasToolTheme();
  const { theme } = useAppTheme();
  const viewportTransform = `translate(${x} ${y}) scale(${scale})`;
@@ -74,6 +74,7 @@ export function CanvasScene({ selectedImageId, selectCanvasImage, updateCanvasIm
         }} 
     // onResponderRelease={onTouchEndSvg}
     onPointerDown={(event) => {
+            if (startMiddlePan(event)) return;
             if (selectedImageId) clearSelection();
             if (isSelectionResizePointerEvent(event))
                 return;
@@ -89,6 +90,7 @@ export function CanvasScene({ selectedImageId, selectCanvasImage, updateCanvasIm
             handlePointerMoveSvg(e);
             handleConfiguredPointerMove(e);
         }} onPointerUp={(event) => {
+            if (finishMiddlePan(event)) return;
             if (Platform.OS === "web" && eraserMode) {
                 finishWebEraserPointer(event);
             }
@@ -96,6 +98,7 @@ export function CanvasScene({ selectedImageId, selectCanvasImage, updateCanvasIm
                 handleConfiguredPointerEnd(event);
             }
         }} onPointerCancel={(event) => {
+            if (finishMiddlePan(event)) return;
             if (Platform.OS === "web" && eraserMode) {
                 finishWebEraserPointer(event, true);
             }
