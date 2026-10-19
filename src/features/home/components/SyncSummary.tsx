@@ -1,40 +1,80 @@
-import { Text, View } from "react-native";
+import { ActivityIndicator, Text, View } from "react-native";
 import { AppIcon } from "../../../shared/icons/AppIcon";
 import type { AppTheme } from "../../../shared/theme/appPalette";
 import { createStyles } from "../homeStyles";
-import { getSyncSummaryState } from "../syncSummary";
+import { getCloudSyncStatusInfo, type CloudSyncStatusLabels } from "../syncSummary";
 
-type Labels = {
-  syncSummaryUnsyncedOne: string;
-  syncSummaryUnsyncedMany: string;
-  syncSummaryAllSynced: string;
-  syncSummaryLocal: string;
-};
-
-export function SyncSummary({ connected, confirmed, unsyncedCount, theme, labels, styles }: {
-  connected: boolean;
-  confirmed: boolean;
+export function SyncSummary({
+  account,
+  accountStatus,
+  entitlementStatus,
+  busy,
+  syncMessage,
+  syncError,
+  syncConfirmed,
+  totalDrawingsCount,
+  unsyncedCount,
+  conflictCount,
+  theme,
+  labels,
+  styles,
+}: {
+  account: { email: string; drive?: string } | null;
+  accountStatus: string;
+  entitlementStatus: string;
+  busy: boolean;
+  syncMessage: string | null;
+  syncError: string | null;
+  syncConfirmed?: boolean;
+  totalDrawingsCount: number;
   unsyncedCount: number;
+  conflictCount?: number;
   theme: AppTheme;
-  labels: Labels;
+  labels: CloudSyncStatusLabels;
   styles: ReturnType<typeof createStyles>;
 }) {
-  const state = getSyncSummaryState(connected, confirmed, unsyncedCount);
-  const label = state === "local" ? labels.syncSummaryLocal : state === "synced"
-    ? labels.syncSummaryAllSynced
-    : unsyncedCount === 1
-      ? labels.syncSummaryUnsyncedOne
-      : labels.syncSummaryUnsyncedMany.replace("{count}", String(unsyncedCount));
-  const synced = state === "synced";
+  const statusInfo = getCloudSyncStatusInfo({
+    account,
+    accountStatus,
+    entitlementStatus,
+    busy,
+    syncMessage,
+    syncError,
+    syncConfirmed,
+    totalDrawingsCount,
+    unsyncedCount,
+    conflictCount,
+    labels,
+  });
+
+  if (!statusInfo) {
+    return null;
+  }
+
+  const colorMap = {
+    accent: theme.accent,
+    primary: theme.primary,
+    muted: theme.textMuted,
+    danger: theme.danger,
+  };
 
   return (
-    <View style={styles.syncSummaryRow}>
-      <AppIcon
-        icon={synced ? "mdi:check-circle-outline" : state === "local" ? "mdi:content-save-outline" : "mdi:cloud-sync-outline"}
-        size={18}
-        color={synced ? theme.accent : theme.primary}
-      />
-      <Text style={styles.syncSummaryText}>{label}</Text>
+    <View style={styles.cloudStatusCard}>
+      {statusInfo.showSpinner ? (
+        <ActivityIndicator size="small" color={theme.primary} />
+      ) : (
+        <AppIcon
+          icon={statusInfo.icon}
+          size={22}
+          color={colorMap[statusInfo.iconColor]}
+        />
+      )}
+      <View style={styles.cloudStatusCardContent}>
+        <Text style={styles.cloudStatusCardTitle}>{statusInfo.title}</Text>
+        {statusInfo.detail ? (
+          <Text style={styles.cloudStatusCardDetail}>{statusInfo.detail}</Text>
+        ) : null}
+      </View>
     </View>
   );
 }

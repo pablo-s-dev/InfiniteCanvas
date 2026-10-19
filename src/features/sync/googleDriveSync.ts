@@ -88,12 +88,10 @@ function debugErrorDetails(error: unknown): { name: string; message: string; sta
 }
 
 function logCloudSyncDiagnostic(diagnostic: CloudSyncDiagnostic, error?: unknown): CloudSyncDiagnostic {
-  if (__DEV__) {
-    console.warn("[CloudSync]", {
-      ...diagnostic,
-      ...(error === undefined ? {} : { originalError: debugErrorDetails(error) }),
-    });
-  }
+  console.warn("[CloudSync]", {
+    ...diagnostic,
+    ...(error === undefined ? {} : { originalError: debugErrorDetails(error) }),
+  });
   return diagnostic;
 }
 
@@ -115,7 +113,7 @@ declare global {
   }
 }
 
-const SESSION_STORAGE_KEY = "infinite-canvas:cloud-sync-session:v1";
+const SESSION_STORAGE_KEY = "infinite_canvas_cloud_sync_session_v1";
 const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const LEGACY_APP_DATA_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
 const GOOGLE_IDENTITY_SCOPE = "openid email profile";

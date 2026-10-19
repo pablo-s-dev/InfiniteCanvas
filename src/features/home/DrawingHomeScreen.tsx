@@ -52,6 +52,7 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
     const [toast, setToast] = useState<ToastState | null>(null);
     const [conflictDrawing, setConflictDrawing] = useState<DrawingSummary | null>(null);
     const [signOutConfirm, setSignOutConfirm] = useState(false);
+    const [buyLoginPrompt, setBuyLoginPrompt] = useState(false);
     const [tagDialogOpen, setTagDialogOpen] = useState(false);
     const [tagEditingDrawing, setTagEditingDrawing] = useState<DrawingSummary | null>(null);
     const [tagEditingSelection, setTagEditingSelection] = useState<string[]>([]);
@@ -277,15 +278,16 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
         }
     };
     useEffect(() => { if (conflictDrawing) void inspectConflict(conflictDrawing.id); }, [conflictDrawing?.id, account?.accountBinding, account?.entitlement.active, account?.drive]);
-    const syncStatusLabel = syncError ?? (busy ? syncMessage ?? t.cloudCheckingAccount
-        : accountStatus === "checking" ? t.cloudCheckingAccount
-        : accountStatus === "expired" ? t.googleDriveSignInRequired : !account ? t.notConnected : entitlementStatus === "pending" ? t.cloudSyncPurchasePending
-        : entitlementStatus === "inactive" ? t.cloudSyncLockedStatus
-        : account.drive === "reauthorization-required" ? t.cloudReconnectDrive : account.drive === "unavailable" ? t.googleDriveSyncFailed : t.cloudConnected);
-    const syncButtonLabel = !account || accountStatus === "expired" ? t.cloudConnectAccount
-        : entitlementStatus === "inactive" ? t.cloudSyncUnlockButton
-        : entitlementStatus === "error" || entitlementStatus === "unknown" ? t.cloudCheckAccess
-        : account.drive === "reauthorization-required" ? t.cloudReconnectDrive : account.drive === "unavailable" ? t.cloudCheckAccess : t.syncNow;
+    const conflictedDrawings = drawings.filter(
+        (d) => d.syncConflict || verifiedConflictIds.includes(d.id),
+    );
+    const syncButtonLabel = !hasCloudSyncAccess
+        ? t.cloudSyncUnlockButton
+        : account?.drive === "reauthorization-required"
+        ? t.cloudReconnectDrive
+        : account?.drive === "unavailable"
+        ? t.cloudCheckAccess
+        : null;
     const renderLibrary = () => (<>
       <View style={styles.headerRow}>
         <View style={styles.headerCopy}>
@@ -450,28 +452,115 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
         </View>
       </View>
       <View style={styles.panel}>
+        <View style={styles.panelHeader}><View style={[styles.panelIconSoft, styles.panelHeaderIcon]}>
+          <AppIcon icon="mdi:account-circle-outline" size={26} color={theme.primary}/>
+        </View>
+        <Text style={[styles.panelTitle, styles.panelHeaderTitle]}>{t.profile}</Text></View>
+        {account ? (
+          <>
+            <View style={styles.profileEmailRow}>
+              <AppIcon icon="mdi:email-outline" size={18} color={theme.textMuted}/>
+              <Text style={styles.profileEmailText} numberOfLines={1}>{account.email}</Text>
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel={t.cloudSignOut} style={({ pressed }) => [styles.secondaryButtonWide, pressed && styles.pressedOpacity]} onPress={() => setSignOutConfirm(true)} {...webTitle(t.cloudSignOut)}>
+              <AppIcon icon="mdi:logout" size={18} color={theme.text}/>
+              <Text style={styles.secondaryButtonWideText}>{t.cloudSignOut}</Text>
+            </Pressable>
+          </>
+        ) : accountStatus === "signing-in" ? (
+          <>
+            <View style={styles.cloudStatusCard}>
+              <ActivityIndicator size="small" color={theme.primary}/>
+              <View style={styles.cloudStatusCardContent}>
+                <Text style={styles.cloudStatusCardTitle}>{t.cloudCheckingAccount}</Text>
+                <Text style={styles.cloudStatusCardDetail}>{t.openingGoogleSignIn}</Text>
+              </View>
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel={t.cancel} style={({ pressed }) => [styles.cancelTextButton, pressed && styles.pressedOpacity]} onPress={() => void signOut()} {...webTitle(t.cancel)}>
+              <Text style={styles.cancelTextButtonText}>{t.cancel}</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <View style={styles.profileEmailRow}>
+              <AppIcon icon="mdi:account-circle-outline" size={18} color={theme.textMuted}/>
+              <Text style={styles.profileEmailText} numberOfLines={1}>{t.notConnected}</Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t.cloudConnectAccount}
+              disabled={busy || accountStatus === "checking"}
+              style={({ pressed }) => [
+                styles.primaryButtonWide,
+                { marginTop: 0 },
+                (busy || accountStatus === "checking") && styles.primaryButtonWideDisabled,
+                pressed && styles.pressedOpacity,
+              ]}
+              onPress={() => void connectDrive()}
+              {...webTitle(t.cloudConnectAccount)}
+            >
+              <AppIcon icon="mdi:cloud-sync-outline" size={20} color={theme.primaryText}/>
+              <Text style={styles.primaryButtonWideText}>{t.cloudConnectAccount}</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
+      <View style={styles.panel}>
         <View style={styles.panelHeader}><View style={[styles.panelIconPrimary, styles.panelHeaderIcon]}>
           <AppIcon icon="mdi:cloud-sync-outline" size={28} color={theme.primaryText}/>
         </View>
         <Text style={[styles.panelTitle, styles.panelHeaderTitle]}>{t.cloudSync}</Text></View>
-        <Text style={styles.panelText}>
-          {hasCloudSyncAccess ? t.cloudSyncHelp : t.cloudSyncPaywallDescription}
-        </Text>
-        <Text style={styles.panelText}>{account?.email ?? ""}</Text>
-        <View style={[styles.inlineStatus, { minHeight: 46 }]}>
-          {(busy || accountStatus === "checking") && <ActivityIndicator color={theme.primary}/>}
-          <Text style={styles.inlineStatusText}>{syncStatusLabel}</Text>
-        </View>
-        <SyncSummary connected={!!account && accountStatus === "connected"} confirmed={syncConfirmed && !loading} unsyncedCount={unsyncedCount} theme={theme} labels={t} styles={styles} />
-        <Pressable accessibilityLabel={syncButtonLabel} disabled={busy || accountStatus === "checking"} style={[
-            styles.primaryButtonWide, (busy || accountStatus === "checking") && styles.primaryButtonWideDisabled,
-        ]} onPress={mainAction} {...webTitle(syncButtonLabel)}>
-          <AppIcon icon="mdi:cloud-sync-outline" size={20} color={theme.primaryText}/>
-          <Text style={styles.primaryButtonWideText}>{syncButtonLabel}</Text>
-        </Pressable>
-        {(account || accountStatus === "signing-in") && <Pressable accessibilityRole="button" style={styles.dialogButton} onPress={() => accountStatus === "signing-in" ? void signOut() : setSignOutConfirm(true)} {...webTitle(accountStatus === "signing-in" ? t.cancel : t.cloudSignOut)}>
-          <Text style={styles.dialogButtonText}>{accountStatus === "signing-in" ? t.cancel : t.cloudSignOut}</Text>
-        </Pressable>}
+        {!account && (
+          <Text style={styles.panelText}>
+            {t.cloudSyncHelp}
+          </Text>
+        )}
+        <SyncSummary
+          account={account}
+          accountStatus={accountStatus}
+          entitlementStatus={entitlementStatus}
+          busy={busy}
+          syncMessage={syncMessage}
+          syncError={syncError}
+          syncConfirmed={syncConfirmed && !loading}
+          totalDrawingsCount={drawings.length}
+          unsyncedCount={unsyncedCount}
+          conflictCount={conflictedDrawings.length}
+          theme={theme}
+          labels={t}
+          styles={styles}
+        />
+        {conflictedDrawings.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t.resolveConflict}
+            style={({ pressed }) => [styles.primaryButtonWide, pressed && styles.pressedOpacity]}
+            onPress={() => setConflictDrawing(conflictedDrawings[0])}
+            {...webTitle(t.resolveConflict)}
+          >
+            <AppIcon icon="mdi:alert-circle-outline" size={20} color={theme.primaryText}/>
+            <Text style={styles.primaryButtonWideText}>{t.resolveConflict}</Text>
+          </Pressable>
+        ) : syncButtonLabel ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={syncButtonLabel}
+            disabled={busy || accountStatus === "checking" || accountStatus === "signing-in"}
+            style={[
+              styles.primaryButtonWide,
+              (busy || accountStatus === "checking" || accountStatus === "signing-in") && styles.primaryButtonWideDisabled,
+            ]}
+            onPress={mainAction}
+            {...webTitle(syncButtonLabel)}
+          >
+            <AppIcon
+              icon={syncButtonLabel === t.cloudSyncUnlockButton ? "mdi:lock-outline" : "mdi:cloud-sync-outline"}
+              size={20}
+              color={theme.primaryText}
+            />
+            <Text style={styles.primaryButtonWideText}>{syncButtonLabel}</Text>
+          </Pressable>
+        ) : null}
       </View>
       <View style={styles.panel}>
         <View style={styles.panelHeader}><View style={[styles.panelIconSoft, styles.panelHeaderIcon]}>
@@ -544,7 +633,7 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
         }}
       />
       <TagDialog visible={tagDialogOpen} value={newTagName} setValue={setNewTagName} onCancel={() => setTagDialogOpen(false)} onSave={createTag} styles={styles} labels={{ title: t.addTag, input: t.tagName, save: t.save, cancel: t.cancel }}/>
-      <ConflictDialog theme={theme} inspection={inspection} canResolve={Boolean(inspection?.remote && account?.entitlement.active && account.drive === "ready")} prerequisiteLabel={syncButtonLabel} onPrerequisite={conflictAction} onReview={() => { if (conflictDrawing) void inspectConflict(conflictDrawing.id); }} busy={conflictBusy} error={conflictError} drawing={inspection?.local.metadata ?? conflictDrawing} onCancel={() => { clearConflictError(); setConflictDrawing(null); }} onResolve={resolveConflict} styles={styles} labels={{
+      <ConflictDialog theme={theme} inspection={inspection} canResolve={Boolean(inspection?.remote && account?.entitlement.active && account.drive === "ready")} prerequisiteLabel={syncButtonLabel ?? t.cloudConnectAccount} onPrerequisite={conflictAction} onReview={() => { if (conflictDrawing) void inspectConflict(conflictDrawing.id); }} busy={conflictBusy} error={conflictError} drawing={inspection?.local.metadata ?? conflictDrawing} onCancel={() => { clearConflictError(); setConflictDrawing(null); }} onResolve={resolveConflict} styles={styles} labels={{
             title: t.resolveSyncConflict,
             help: inspection?.kind === "unbased" ? t.cloudUnbasedConflict : t.resolveSyncConflictHelp,
             review: t.cloudReviewAgain,
@@ -596,7 +685,21 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
             setOptionsDrawing(null);
             void deleteDrawing(drawingId);
         }}/>
-      <CloudSyncPaywall visible={cloudSyncPaywallOpen} theme={theme} formattedPrice={cloudSyncPurchaseStatus.formattedPrice} productAvailable={cloudSyncPurchaseStatus.productAvailable} checkingProduct={!billingReady && Platform.OS === "android"} busy={billingBusy} busyLabel={billingAction === "restore" ? t.cloudSyncCheckingPurchase : t.cloudSyncOpeningCheckout} feedback={billingFeedback} onClose={() => setCloudSyncPaywallOpen(false)} onBuy={() => void buyCloudSync()} onRestore={() => void restoreCloudSyncPurchase()} labels={{
+      <CloudSyncPaywall visible={cloudSyncPaywallOpen} theme={theme} formattedPrice={cloudSyncPurchaseStatus.formattedPrice} productAvailable={cloudSyncPurchaseStatus.productAvailable} checkingProduct={!billingReady && Platform.OS === "android"} busy={billingBusy} busyLabel={billingAction === "restore" ? t.cloudSyncCheckingPurchase : t.cloudSyncOpeningCheckout} feedback={billingFeedback} onClose={() => setCloudSyncPaywallOpen(false)} onBuy={() => {
+        if (!account) {
+          setCloudSyncPaywallOpen(false);
+          setBuyLoginPrompt(true);
+          return;
+        }
+        void buyCloudSync();
+      }} onRestore={() => {
+        if (!account) {
+          setCloudSyncPaywallOpen(false);
+          setBuyLoginPrompt(true);
+          return;
+        }
+        void restoreCloudSyncPurchase();
+      }} labels={{
             title: t.cloudSyncPaywallTitle,
             body: t.cloudSyncPaywallDescription,
             buy: t.cloudSyncBuy,
@@ -608,11 +711,67 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
             priceLine: t.cloudSyncOneTimePrice,
         }}/>
       <Modal transparent visible={signOutConfirm} animationType="fade" onRequestClose={() => setSignOutConfirm(false)}>
-        <View style={styles.dialogBackdrop}><View style={styles.dialog}>
-          <Text style={styles.dialogTitle}>{t.cloudSignOut}</Text><Text style={styles.dialogHelpText}>{t.cloudConfirmSignOut}</Text>
-          <Pressable style={styles.dialogButtonPrimary} {...webTitle(t.cloudSignOut)} onPress={() => {setSignOutConfirm(false); setConflictDrawing(null); void signOut();}}><Text style={styles.dialogButtonPrimaryText}>{t.cloudSignOut}</Text></Pressable>
-          <Pressable style={styles.dialogButton} {...webTitle(t.cancel)} onPress={() => setSignOutConfirm(false)}><Text style={styles.dialogButtonText}>{t.cancel}</Text></Pressable>
-        </View></View>
+        <View style={styles.dialogBackdrop}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>{t.cloudSignOut}</Text>
+            <Text style={styles.dialogHelpText}>{t.cloudConfirmSignOut}</Text>
+            <View style={styles.dialogActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t.cloudSignOut}
+                style={({ pressed }) => [styles.dialogButtonPrimary, pressed && styles.pressedOpacity]}
+                {...webTitle(t.cloudSignOut)}
+                onPress={() => {
+                  setSignOutConfirm(false);
+                  setConflictDrawing(null);
+                  void signOut();
+                }}
+              >
+                <Text style={styles.dialogButtonPrimaryText}>{t.cloudSignOut}</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t.cancel}
+                style={({ pressed }) => [styles.dialogButtonGhost, pressed && styles.pressedOpacity]}
+                {...webTitle(t.cancel)}
+                onPress={() => setSignOutConfirm(false)}
+              >
+                <Text style={styles.dialogButtonGhostText}>{t.cancel}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal transparent visible={buyLoginPrompt} animationType="fade" onRequestClose={() => setBuyLoginPrompt(false)}>
+        <View style={styles.dialogBackdrop}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>{t.cloudSyncSignInPromptTitle}</Text>
+            <Text style={styles.dialogHelpText}>{t.cloudSyncSignInToBuy}</Text>
+            <View style={styles.dialogActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t.cloudConnectAccount}
+                style={({ pressed }) => [styles.dialogButtonPrimary, pressed && styles.pressedOpacity]}
+                {...webTitle(t.cloudConnectAccount)}
+                onPress={() => {
+                  setBuyLoginPrompt(false);
+                  void connectDrive();
+                }}
+              >
+                <Text style={styles.dialogButtonPrimaryText}>{t.cloudConnectAccount}</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t.cancel}
+                style={({ pressed }) => [styles.dialogButtonGhost, pressed && styles.pressedOpacity]}
+                {...webTitle(t.cancel)}
+                onPress={() => setBuyLoginPrompt(false)}
+              >
+                <Text style={styles.dialogButtonGhostText}>{t.cancel}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
       </Modal>
       {toast && <ToastMessage toast={toast} styles={styles} theme={theme} closeLabel={t.close} onDismiss={() => setToast(current => current === toast ? null : current)}/>}
     </SafeAreaView>);

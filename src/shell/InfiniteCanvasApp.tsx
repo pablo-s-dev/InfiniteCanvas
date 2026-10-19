@@ -30,7 +30,6 @@ import { downloadDrawingOnWeb, encodeDrawingRaster, renderDrawingSvg, saveDrawin
 import type { DrawingImageFormat } from "../features/sharing/drawingImageExport";
 import { DrawingRasterizer } from "../features/sharing/DrawingRasterizer";
 import type { DrawingRasterRequest } from "../features/sharing/DrawingRasterizer";
-import { registerCloudSyncBackgroundTask } from "../features/sync/cloudSyncBackgroundTask";
 const THEME_KEY = "infinite-canvas:theme-mode";
 const LANGUAGE_KEY = "infinite-canvas:language";
 type RasterExportAction = "download" | "share" | "download-selected";
@@ -558,11 +557,6 @@ function InfiniteCanvasAppContent() {
     </>);
 }
 export default function InfiniteCanvasApp() {
-    useEffect(() => {
-        void registerCloudSyncBackgroundTask().catch((error: unknown) => {
-            console.warn("Could not register background Cloud Sync", error);
-        });
-    }, []);
     useEffect(() => {
         if (Platform.OS !== "web" || typeof document === "undefined")
             return;

@@ -1,5 +1,6 @@
 package com.PabloS.InfiniteCanvas
 
+import android.util.Log
 import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingFlowParams
@@ -185,13 +186,17 @@ class CloudSyncBillingModule(
       .setProductList(listOf(product))
       .build()
 
+    Log.d(TAG, "queryProductDetails for productId=$PRODUCT_ID")
     billingClient.queryProductDetailsAsync(params) { result, queryResult ->
+      Log.d(TAG, "queryProductDetails responseCode=${result.responseCode}, debugMessage=${result.debugMessage}")
       if (result.responseCode != BillingClient.BillingResponseCode.OK) {
         callback(null, result.debugMessage.ifBlank { "Could not load the Cloud Sync price." })
         return@queryProductDetailsAsync
       }
+      val matchedProduct = queryResult.productDetailsList.firstOrNull { it.productId == PRODUCT_ID }
+      Log.d(TAG, "queryProductDetails matchedProduct=$matchedProduct")
       callback(
-        queryResult.productDetailsList.firstOrNull { it.productId == PRODUCT_ID },
+        matchedProduct,
         queryResult.unfetchedProductList.firstOrNull()?.let { it.statusCode.toString() },
       )
     }
@@ -232,6 +237,7 @@ class CloudSyncBillingModule(
   }
 
   companion object {
+    private const val TAG = "InfiniteCanvasBilling"
     private const val MODULE_NAME = "InfiniteCanvasCloudSyncBilling"
     private const val PRODUCT_ID = "cloud_sync_unlock"
   }

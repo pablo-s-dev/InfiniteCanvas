@@ -75,11 +75,11 @@ function useCloudSyncController() {
   const handleError = (error: unknown) => {
     if (error instanceof CloudSyncApiError && error.code === "account_changed") return;
     setConfirmedSyncBinding(null);
-    if (__DEV__ && Platform.OS === "android") {
+    if (Platform.OS === "android") {
       const diagnostic: CloudSyncDiagnostic = error instanceof CloudSyncApiError
         ? error.diagnostic ?? {stage: "cloud_sync", code: error.code, status: error.status}
         : {stage: "cloud_sync", code: error instanceof Error ? error.name : "unknown_error"};
-      console.warn("[CloudSync]", diagnostic);
+      console.warn("[CloudSync]", diagnostic, error instanceof Error ? error.message : String(error));
     }
     if (error instanceof CloudSyncApiError && ["session_expired", "session_required"].includes(error.code)) {
       setAccountStatus("expired"); setEntitlementStatus("unknown");
@@ -157,9 +157,8 @@ function useCloudSyncController() {
     await googleDriveSync.signOut();
   }
   const openCloudSyncPaywall = () => {
-    if (accountStatus === "connected" && entitlementStatus === "inactive") {setBillingFeedback(null); setCloudSyncPaywallOpen(true);}
-    else if (!accountRef.current) void connectDrive();
-    else void runOperation(async () => {const next = await checkAccount(); if (next && next.entitlement.active === false && next.entitlement.status !== "pending") setCloudSyncPaywallOpen(true);});
+    setBillingFeedback(null);
+    setCloudSyncPaywallOpen(true);
   };
   async function refreshBilling() {
     if (Platform.OS !== "android" || !cloudSyncBilling.isAvailable) {setBillingReady(true); return null;}
@@ -276,19 +275,17 @@ function useCloudSyncController() {
       setRepositoryVersion(value => value + 1);
       if (localEdit) {setConfirmedSyncBinding(null); localEditsPending.current = true; clearTimeout(timer); timer = setTimeout(() => {if (accountRef.current?.entitlement.active) void latestSync.current({interactive: false});}, 1200);}
     });
-    const interval = setInterval(() => {if (accountRef.current?.entitlement.active) void latestSync.current({interactive: false});}, 60000);
     const online = () => {if (accountRef.current) void latestSync.current({interactive: false});};
     if (Platform.OS === "web") window.addEventListener("online", online);
-    return () => {mounted.current = false; generation.current += 1; unsubscribe(); clearTimeout(timer); clearInterval(interval); if (Platform.OS === "web") window.removeEventListener("online", online);};
+    return () => {mounted.current = false; generation.current += 1; unsubscribe(); clearTimeout(timer); if (Platform.OS === "web") window.removeEventListener("online", online);};
   }, []);
   const hasCloudSyncAccess = entitlementStatus === "active";
   const syncConfirmed = !!account && confirmedSyncBinding === account.accountBinding &&
     accountStatus === "connected" && hasCloudSyncAccess && account.drive === "ready" && !busy && !syncError;
   const syncState: SyncState = busy ? {status: "syncing"} : accountStatus === "connected" ? {status: "ready", email: account?.email} : {status: "signed-out"};
   const mainAction = () => {
-    if (!accountRef.current || accountStatus === "expired") return void connectDrive();
-    if (entitlementStatus === "inactive") return openCloudSyncPaywall();
-    if (accountRef.current.drive === "reauthorization-required") return void connectDrive();
+    if (!hasCloudSyncAccess) return openCloudSyncPaywall();
+    if (accountRef.current?.drive === "reauthorization-required") return void connectDrive();
     void syncLocalDrawings();
   };
   return {conflictAction: () => {if (!googleDriveSync.isReady()) void connectDrive({expectedAccountBinding: inspection?.accountBinding}); else mainAction();}, verifiedConflictIds, foreignDrawingIds, unconfirmedDrawingIds, copyToCurrentAccount, language, setLanguage, account, accountStatus, entitlementStatus, busy, syncError, mainAction, signOut,

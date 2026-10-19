@@ -43,3 +43,4 @@ google-oauth-client*.json
 old/
 outputs/
 .ignore
+.vibe-wise/

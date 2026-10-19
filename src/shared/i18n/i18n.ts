@@ -61,6 +61,24 @@ const dictionary = {
 
     settings: "Settings",
 
+    profile: "Profile",
+
+    cloudSyncNotConnectedEmpty: "Connect your account to back up and sync your drawings.",
+
+    syncSummaryLocalOne: "1 drawing saved only on this device",
+
+    syncSummaryLocalMany: "{count} drawings saved only on this device",
+
+    cloudSyncReadyEmpty: "Cloud sync is active. New drawings will sync automatically.",
+
+    syncSummaryAllSyncedDetailOne: "1 drawing is backed up in Google Drive.",
+
+    syncSummaryAllSyncedDetailMany: "All {count} drawings are backed up in Google Drive.",
+
+    syncSummaryPendingDetail: "Tap Sync now to back up to Google Drive.",
+
+    cloudSyncLockedDetail: "Unlock Cloud Sync to back up your drawings to Google Drive.",
+
     syncSummaryUnsyncedOne: "1 drawing not synced",
 
     syncSummaryUnsyncedMany: "{count} drawings not synced",
@@ -224,6 +242,14 @@ const dictionary = {
 
     couldNotResolveSyncConflict: "Could not resolve sync conflict.",
 
+    syncConflictDetectedOne: "1 sync conflict",
+
+    syncConflictDetectedMany: "{count} sync conflicts",
+
+    syncConflictDetail: "Local and cloud versions differ. Resolve to continue syncing.",
+
+    resolveConflict: "Resolve conflict",
+
     resolveSyncConflict: "Resolve sync conflict",
 
     resolveSyncConflictHelp:
@@ -354,6 +380,12 @@ const dictionary = {
 
       "{count} older Drive file(s) were skipped because their data was invalid. The original files and local drawings were kept.",
 
+  
+
+    cloudSyncSignInPromptTitle: "Google Account Required",
+
+    cloudSyncSignInToBuy:
+      "Connect your Google account first to purchase and activate Cloud Sync.",
   },
 
   pt: {
@@ -386,6 +418,24 @@ const dictionary = {
     tags: "Tags",
 
     settings: "Ajustes",
+
+    profile: "Perfil",
+
+    cloudSyncNotConnectedEmpty: "Conecte sua conta para fazer backup e sincronizar seus desenhos.",
+
+    syncSummaryLocalOne: "1 desenho salvo apenas neste dispositivo",
+
+    syncSummaryLocalMany: "{count} desenhos salvos apenas neste dispositivo",
+
+    cloudSyncReadyEmpty: "Sincronização ativa. Novos desenhos serão sincronizados automaticamente.",
+
+    syncSummaryAllSyncedDetailOne: "1 desenho está salvo no Google Drive.",
+
+    syncSummaryAllSyncedDetailMany: "Todos os {count} desenhos estão salvos no Google Drive.",
+
+    syncSummaryPendingDetail: "Toque em Sincronizar agora para enviar ao Google Drive.",
+
+    cloudSyncLockedDetail: "Desbloqueie o Cloud Sync para fazer backup dos seus desenhos no Google Drive.",
 
     syncSummaryUnsyncedOne: "1 desenho não sincronizado",
 
@@ -552,6 +602,14 @@ const dictionary = {
 
       "Não foi possível resolver o conflito de sincronização.",
 
+    syncConflictDetectedOne: "1 conflito de sincronização",
+
+    syncConflictDetectedMany: "{count} conflitos de sincronização",
+
+    syncConflictDetail: "As versões local e da nuvem diferem. Resolva para continuar sincronizando.",
+
+    resolveConflict: "Resolver conflito",
+
     resolveSyncConflict: "Resolver conflito de sincronização",
 
     resolveSyncConflictHelp:
@@ -688,6 +746,12 @@ const dictionary = {
 
       "{count} arquivo(s) antigo(s) do Drive foram ignorados porque os dados são inválidos. Os originais e os desenhos locais foram preservados.",
 
+  
+
+    cloudSyncSignInPromptTitle: "Conta Google necessária",
+
+    cloudSyncSignInToBuy:
+      "Conecte sua conta Google primeiro para comprar e ativar a sincronização na nuvem.",
   },
 
   es: {
@@ -720,6 +784,24 @@ const dictionary = {
     tags: "Etiquetas",
 
     settings: "Ajustes",
+
+    profile: "Perfil",
+
+    cloudSyncNotConnectedEmpty: "Conecta tu cuenta para hacer copias de seguridad y sincronizar tus dibujos.",
+
+    syncSummaryLocalOne: "1 dibujo guardado solo en este dispositivo",
+
+    syncSummaryLocalMany: "{count} dibujos guardados solo en este dispositivo",
+
+    cloudSyncReadyEmpty: "Sincronización activa. Los nuevos dibujos se sincronizarán automáticamente.",
+
+    syncSummaryAllSyncedDetailOne: "1 dibujo respaldado en Google Drive.",
+
+    syncSummaryAllSyncedDetailMany: "Los {count} dibujos están respaldados en Google Drive.",
+
+    syncSummaryPendingDetail: "Toca Sincronizar ahora para enviar a Google Drive.",
+
+    cloudSyncLockedDetail: "Desbloquea Cloud Sync para respaldar tus dibujos en Google Drive.",
 
     syncSummaryUnsyncedOne: "1 dibujo sin sincronizar",
 
@@ -886,6 +968,14 @@ const dictionary = {
 
       "No se pudo resolver el conflicto de sincronización.",
 
+    syncConflictDetectedOne: "1 conflicto de sincronización",
+
+    syncConflictDetectedMany: "{count} conflictos de sincronización",
+
+    syncConflictDetail: "Las versiones local y en la nube difieren. Resuélvelo para continuar sincronizando.",
+
+    resolveConflict: "Resolver conflicto",
+
     resolveSyncConflict: "Resolver conflicto de sincronización",
 
     resolveSyncConflictHelp:
@@ -1022,6 +1112,12 @@ const dictionary = {
 
       "Se omitieron {count} archivo(s) antiguo(s) de Drive por tener datos no válidos. Se conservaron los originales y los dibujos locales.",
 
+  
+
+    cloudSyncSignInPromptTitle: "Cuenta de Google requerida",
+
+    cloudSyncSignInToBuy:
+      "Conecta tu cuenta de Google primero para comprar y activar la sincronización en la nube.",
   },
 
 } as const;

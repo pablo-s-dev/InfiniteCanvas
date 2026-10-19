@@ -1,6 +1,7 @@
 package com.PabloS.InfiniteCanvas
 
 import android.util.Base64
+import android.util.Log
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -51,13 +52,16 @@ class PlayIntegrityModule(
     val prepareRequest = StandardIntegrityManager.PrepareIntegrityTokenRequest.builder()
       .setCloudProjectNumber(projectNumber)
       .build()
+    Log.d(TAG, "Preparing integrity token for projectNumber=$projectNumber")
     manager.prepareIntegrityToken(prepareRequest)
       .addOnSuccessListener { tokenProvider ->
+        Log.d(TAG, "Integrity token provider prepared successfully")
         provider = tokenProvider
         preparedForProject = projectNumber
         requestToken(tokenProvider, requestHash, promise)
       }
       .addOnFailureListener { error ->
+        Log.e(TAG, "Integrity token provider prepare failed: ${error.message}", error)
         promise.reject(
           "integrity_prepare_failed",
           error.message ?: "Google Play could not prepare app integrity verification.",
@@ -71,12 +75,17 @@ class PlayIntegrityModule(
     requestHash: String,
     promise: Promise,
   ) {
+    Log.d(TAG, "Requesting integrity token for hash=$requestHash")
     val request = StandardIntegrityManager.StandardIntegrityTokenRequest.builder()
       .setRequestHash(requestHash)
       .build()
     tokenProvider.request(request)
-      .addOnSuccessListener { token -> promise.resolve(token.token()) }
+      .addOnSuccessListener { token ->
+        Log.d(TAG, "Integrity token acquired successfully")
+        promise.resolve(token.token())
+      }
       .addOnFailureListener { error ->
+        Log.e(TAG, "Integrity token request failed: ${error.message}", error)
         provider = null
         preparedForProject = null
         promise.reject(
@@ -88,6 +97,7 @@ class PlayIntegrityModule(
   }
 
   companion object {
+    private const val TAG = "InfiniteCanvasIntegrity"
     private const val MODULE_NAME = "InfiniteCanvasPlayIntegrity"
     private const val MAX_CANONICAL_REQUEST_CHARS = 6 * 1024 * 1024
   }

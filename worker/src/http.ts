@@ -130,6 +130,7 @@ export function expectString(
 
 export function errorResponse(error: unknown): Response {
   if (error instanceof HttpError) {
+    console.error("[HTTP Error]", error.status, error.code, error.message);
     return jsonResponse({ error: { code: error.code, message: error.message } }, error.status);
   }
   console.error(JSON.stringify({ event: "request_failed", error: error instanceof Error ? error.message : "unknown" }));

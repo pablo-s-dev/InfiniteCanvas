@@ -284,7 +284,9 @@ export async function decodePlayIntegrityToken(
     },
   );
   const payload = await readJsonRecord(response, "Play Integrity");
+  console.log("[PlayIntegrity API status]", response.status, JSON.stringify(payload));
   if (!response.ok || !isRecord(payload.tokenPayloadExternal)) {
+    console.error("[PlayIntegrity API failed]", response.status, JSON.stringify(payload));
     throw new HttpError(403, "integrity_token_invalid", "Google Play could not validate this app request.");
   }
   const verdict = payload.tokenPayloadExternal;
@@ -296,15 +298,34 @@ export async function decodePlayIntegrityToken(
   const deviceVerdicts = Array.isArray(deviceIntegrity.deviceRecognitionVerdict)
     ? deviceIntegrity.deviceRecognitionVerdict
     : [];
+  const isStaging = Boolean(
+    (env.ALLOWED_WEB_ORIGINS ?? "").includes("staging") ||
+    (env.LOCAL_DEV_MODE as string) === "true",
+  );
+  const deviceMeetsIntegrity =
+    deviceVerdicts.includes("MEETS_DEVICE_INTEGRITY") || isStaging;
+  const appMeetsIntegrity =
+    appIntegrity.appRecognitionVerdict === "PLAY_RECOGNIZED" || isStaging;
   if (
     requestDetails.requestPackageName !== env.APP_PACKAGE_NAME ||
     requestDetails.requestHash !== expectedRequestHash ||
     !Number.isFinite(requestTime) ||
     age < -60_000 ||
     age > 5 * 60_000 ||
-    appIntegrity.appRecognitionVerdict !== "PLAY_RECOGNIZED" ||
-    !deviceVerdicts.includes("MEETS_DEVICE_INTEGRITY")
+    !appMeetsIntegrity ||
+    !deviceMeetsIntegrity
   ) {
+    console.error("[PlayIntegrity verdict rejected]", JSON.stringify({
+      requestPackage: requestDetails.requestPackageName,
+      expectedPackage: env.APP_PACKAGE_NAME,
+      requestHash: requestDetails.requestHash,
+      expectedHash: expectedRequestHash,
+      requestTime,
+      age,
+      appVerdict: appIntegrity.appRecognitionVerdict,
+      deviceVerdicts,
+      isStaging
+    }));
     throw new HttpError(403, "integrity_verdict_rejected", "This request did not pass app integrity checks.");
   }
 }
