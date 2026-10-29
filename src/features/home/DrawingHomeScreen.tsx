@@ -287,6 +287,8 @@ export function DrawingHomeScreen({ onOpenCanvas, onExportSelectedDrawings, onCr
         ? t.cloudReconnectDrive
         : account?.drive === "unavailable"
         ? t.cloudCheckAccess
+        : syncError || unsyncedCount > 0
+        ? t.syncNow
         : null;
     const renderLibrary = () => (<>
       <View style={styles.headerRow}>

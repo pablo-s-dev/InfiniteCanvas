@@ -297,7 +297,7 @@ export function CanvasToolbar({ onInsertShape, onInsertImage, buttonsContainerCo
               </Text>
             </View>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-              <MenuOption {...{ runFromMenu, menuButtonStyle, activeToolButtonStyle }} label="Lasso" icon="mdi:select-drag" active={lassoMode} onPress={activateLassoMode}/>
+              <MenuOption {...{ runFromMenu, menuButtonStyle, activeToolButtonStyle }} label="Lasso" icon="mdi:lasso" active={lassoMode} onPress={activateLassoMode}/>
               <MenuOption {...{ runFromMenu, menuButtonStyle, activeToolButtonStyle }} label="Rectangle select" icon="mdi:selection-drag" active={rectangleSelectionMode} onPress={activateRectangleSelectionMode}/>
             </View>
           </>)}
@@ -386,7 +386,7 @@ export function CanvasToolbar({ onInsertShape, onInsertImage, buttonsContainerCo
             !eraserMode &&
             !lassoMode &&
             !rectangleSelectionMode} onPress={activateStrokeMode} menu="stroke"/>
-        <ToolButton {...{ menuTriggerProps, openMenu, setToolMenu, toolButtonStyle, activeToolButtonStyle }} label={rectangleSelectionMode ? "Rectangle select" : "Lasso select"} icon={rectangleSelectionMode ? "mdi:selection-drag" : "mdi:select-drag"} active={lassoMode || rectangleSelectionMode} onPress={activateLassoMode} menu="selection"/>
+        <ToolButton {...{ menuTriggerProps, openMenu, setToolMenu, toolButtonStyle, activeToolButtonStyle }} label={rectangleSelectionMode ? "Rectangle select" : "Lasso select"} icon={rectangleSelectionMode ? "mdi:selection-drag" : "mdi:lasso"} active={lassoMode || rectangleSelectionMode} onPress={activateLassoMode} menu="selection"/>
         <ToolButton {...{ menuTriggerProps, openMenu, setToolMenu, toolButtonStyle, activeToolButtonStyle }} label="Move canvas" icon="mdi:hand-back-right-outline" active={onlyPanningMode} onPress={activatePanMode}/>
         <ToolButton {...{ menuTriggerProps, openMenu, setToolMenu, toolButtonStyle, activeToolButtonStyle }} label={eraserModeType === "point" ? "Erase points" : "Erase strokes"} icon={eraserModeType === "point" ? "mdi:eraser" : "mdi:eraser-variant"} active={eraserMode} onPress={activateEraserMode} menu="eraser"/>
         <ToolButton {...{ menuTriggerProps, openMenu, setToolMenu, toolButtonStyle, activeToolButtonStyle }} label={pointerDrawMode ? "Pointer draw mode" : "Pointer move mode"} icon={pointerDrawMode ? "mdi:pencil-outline" : "mdi:cursor-default-outline"} active={pointerMode} onPress={activatePointerMode} menu="pointer"/>

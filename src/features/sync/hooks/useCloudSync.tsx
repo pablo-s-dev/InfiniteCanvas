@@ -69,7 +69,7 @@ function useCloudSyncController() {
   const applyAccount = (next: CloudSyncAccount) => {
     if (accountRef.current?.accountBinding !== next.accountBinding) setConfirmedSyncBinding(null);
     accountRef.current = next; setAccount(next); setAccountStatus("connected");
-    setEntitlementStatus(next.entitlement.active === null ? "error" : next.entitlement.active ? "active" : next.entitlement.status === "pending" ? "pending" : "inactive");
+    setEntitlementStatus(current => next.entitlement.active === true ? "active" : next.entitlement.active === false ? (next.entitlement.status === "pending" ? "pending" : "inactive") : (current === "active" ? "active" : "error"));
     if (next.entitlement.active) setCloudSyncPaywallOpen(false);
   };
   const handleError = (error: unknown) => {
@@ -87,12 +87,12 @@ function useCloudSyncController() {
     } else {
       const settledAccountStatus = accountRef.current ? "connected" : "signed-out";
       setAccountStatus(status => status === "checking" || status === "signing-in" ? settledAccountStatus : status);
-      setEntitlementStatus("error");
+      setEntitlementStatus(current => current === "active" ? "active" : "error");
     }
     setSyncError(message(error));
   };
   async function checkAccount(): Promise<CloudSyncAccount | null> {
-    const guard = guardFor(); setEntitlementStatus("checking");
+    const guard = guardFor(); setEntitlementStatus(current => current === "active" ? "active" : "checking");
     try {
       const next = await googleDriveSync.restoreAccount(); guard();
       if (!next) {setAccountStatus(accountRef.current ? "expired" : "signed-out"); setEntitlementStatus("unknown"); return null;}

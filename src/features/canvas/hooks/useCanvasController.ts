@@ -1,6 +1,6 @@
 import { useCanvasSelectionInteractions } from "./useCanvasSelectionInteractions";
 import { useScribbleEraseFreeze } from "./useScribbleEraseFreeze";
-import { pathIntersectsPolygon } from "../selectionGeometry";
+import { buildLassoPath, selectPathsInPolygon, viewportToCanvas, canvasToViewport } from "../lassoSelection";
 import { translatePathData, scalePathData } from "../pathTransforms";
 import { isShapeTool } from "../pathGeometry";
 import { useState, useEffect, useRef } from "react";
@@ -340,10 +340,7 @@ export function useCanvasController({ localDrawingId, onCanvasDataChange, canvas
         // Then, we divide it by the scale, to appear normal on the current scale.
         // It's like we are undoing the scaling, the current scale is like our multiplicative origin.
         // We still need to subtract the panningOffset. Previously we used it to undo the scaling error.
-        return [
-            (x - translateX) / currentScale,
-            (y - translateY) / currentScale,
-        ];
+        return viewportToCanvas([x, y], [translateX, translateY], currentScale);
     };
     const canvasPointToScreenPoint = (point: [
         number,
@@ -353,10 +350,7 @@ export function useCanvasController({ localDrawingId, onCanvasDataChange, canvas
         number
     ] => {
         const [translateX, translateY] = getCanvasViewportTransform(currentScale);
-        return [
-            translateX + point[0] * currentScale,
-            translateY + point[1] * currentScale,
-        ];
+        return canvasToViewport(point, [translateX, translateY], currentScale);
     };
     const appendEraseHistoryEntry = (erasedItemIds: string[]) => {
         const uniqueErasedItemIds = [...new Set(erasedItemIds)];
@@ -462,8 +456,8 @@ export function useCanvasController({ localDrawingId, onCanvasDataChange, canvas
     };
     const updateLassoPath = (x: number, y: number, scale: number) => {
         const point = screenPointToCanvasPoint(x, y, scale);
-        lassoPointsRef.current = [...lassoPointsRef.current, point];
-        setLassoPath(buildSmoothedPath(lassoPointsRef.current));
+        lassoPointsRef.current.push(point);
+        setLassoPath(buildLassoPath(lassoPointsRef.current));
     };
     const updateRectangleSelectionPath = (x: number, y: number, scale: number) => {
         const endPoint = screenPointToCanvasPoint(x, y, scale);
@@ -479,44 +473,15 @@ export function useCanvasController({ localDrawingId, onCanvasDataChange, canvas
         ];
         setLassoPath(`M ${x1} ${y1} L ${x2} ${y1} L ${x2} ${y2} L ${x1} ${y2} Z`);
     };
-    const finalizeLassoSelection = () => {
-        const polygon = lassoPointsRef.current;
-        const firstPoint = polygon[0];
-        const lastPoint = polygon[polygon.length - 1];
-        const scaleForTolerance = Math.max(scale, 0.1);
-        const isClosedLasso = !firstPoint ||
-            !lastPoint ||
-            (polygon.length >= 4 &&
-                Math.hypot(lastPoint[0] - firstPoint[0], lastPoint[1] - firstPoint[1]) <=
-                    18 / scaleForTolerance);
-        const polygonArea = Math.abs(polygon.reduce((area, point, index) => {
-            const nextPoint = polygon[(index + 1) % polygon.length];
-            return area + point[0] * nextPoint[1] - nextPoint[0] * point[1];
-        }, 0) / 2);
-        const hasEnoughArea = polygonArea >= 16 / (scaleForTolerance * scaleForTolerance);
-        if (polygon.length < 3 ||
-            (!rectangleSelectionMode && !isClosedLasso) ||
-            !hasEnoughArea) {
-            lassoPointsRef.current = [];
-            setLassoPath("");
-            rectangleSelectionStartRef.current = null;
-            setSelectedPathIndexes([]);
-        setSelectedImageId(null);
-            return;
-        }
-        const selectedIndexes = svgItems
-            .map((item, index) => {
-            const points = extractPathPoints(item.data);
-            const padding = ((item.width ?? strokeWidth) / 2 + 2) / scaleForTolerance;
-            return pathIntersectsPolygon(points, polygon, padding)
-                ? index
-                : null;
-        })
-            .filter((index): index is number => index !== null);
-        setSelectedPathIndexes(selectedIndexes);
+    const cancelSelectionGesture = () => {
         lassoPointsRef.current = [];
         setLassoPath("");
         rectangleSelectionStartRef.current = null;
+    };
+    const finalizeLassoSelection = () => {
+        setSelectedPathIndexes(selectPathsInPolygon(svgItems, lassoPointsRef.current, scale));
+        setSelectedImageId(null);
+        cancelSelectionGesture();
     };
     const { schedule: scheduleScribbleFreeze, cancel: cancelScribbleFreeze, consumedRef: scribbleEraseConsumedRef } = useScribbleEraseFreeze({
         pointsRef: currentStrokePointsRef,
@@ -1095,6 +1060,12 @@ export function useCanvasController({ localDrawingId, onCanvasDataChange, canvas
             return;
         }
         if (lassoMode || rectangleSelectionMode) {
+            const lastTouch = e.nativeEvent.changedTouches?.[0];
+            if (lastTouch && lassoPointsRef.current.length) {
+                const [x, y] = getCanvasTouchPosition(lastTouch);
+                if (rectangleSelectionMode) updateRectangleSelectionPath(x, y, scale);
+                else updateLassoPath(x, y, scale);
+            }
             finalizeLassoSelection();
             setShouldBlockDrawing(false);
             return;
@@ -1717,7 +1688,7 @@ export function useCanvasController({ localDrawingId, onCanvasDataChange, canvas
         if (selectedPathIndexes.length > 0) {
             clearSelection();
         }
-        if (pointerType === "touch") {
+        if (pointerType === "touch" && !lassoMode && !rectangleSelectionMode) {
             webPointerModeRef.current = "pan";
             webPointerLastPositionRef.current = position;
             setShouldBlockDrawing(true);
@@ -1842,7 +1813,14 @@ export function useCanvasController({ localDrawingId, onCanvasDataChange, canvas
             prepareForNextDrawing();
         }
         else if (mode === "lasso" || mode === "rectangle") {
-            finalizeLassoSelection();
+            if ((e.type ?? nativeEvent.type) === "pointercancel") {
+                cancelSelectionGesture();
+            } else {
+                const position = getWebPointerPosition(e);
+                if (mode === "rectangle") updateRectangleSelectionPath(position[0], position[1], scale);
+                else updateLassoPath(position[0], position[1], scale);
+                finalizeLassoSelection();
+            }
             setShouldBlockDrawing(false);
         }
         else if (mode === "pointer") {
@@ -2136,5 +2114,5 @@ export function useCanvasController({ localDrawingId, onCanvasDataChange, canvas
         const subscription = Dimensions.addEventListener("change", updateHeight);
         return () => subscription?.remove(); // Cleanup on unmount
     }, []);
-    return { startMiddlePan, finishMiddlePan, selectedImageId, selectCanvasImage, updateCanvasImage, insertShapeAtCenter: (tool: Exclude<ShapeTool, "freehand">) => insertShapeAtCanvasPoint(insertionCenter(), tool), insertImageAtCenter: () => pickImageAtCanvasPoint(insertionCenter()), canvasBackgroundColor, buttonsContainerColor, curIdx, canvasItems, setCurIdx, windowHeight, canvasCursor, canvasRef, nativeTouchActiveRef, onTouchMoveSvg, onTouchStartSvg, onTouchEndSvg, cancelScribbleFreeze, nativeTwoFingerGestureActiveRef, prevFingersPos, prevTwoFingerDist, setShouldBlockDrawing, eraserMode, cancelEraserGesture, lassoMode, rectangleSelectionMode, finalizeLassoSelection, prepareForNextDrawing, isSelectionResizePointerEvent, selectedPathIndexes, clearSelection, startWebEraserPointer, handleConfiguredPointerStart, handlePointerMoveSvg, handleConfiguredPointerMove, finishWebEraserPointer, handleConfiguredPointerEnd, eraserPointerIdRef, getWebPointerPosition, queueEraserTrailPoint, webCanvasEventProps, onCanvasLayout, svgRef, x, y, scale, svgItems, pendingEraseItemIds, selectedBounds, lassoPath, eraserPreviewPath, eraserPreviewOpacity, strokeColorPreview, curPath, strokeWidth, imgItems, selectionScreenBounds, isSelectionDragging, isSelectionResizing, startSelectionDrag, moveSelectionDrag, endSelectionDrag, startSelectionResize, moveSelectionResize, endSelectionResize, duplicateSelectedPaths, deleteSelectedPaths, canvasContextMenu, pasteSelectionAtContextMenu, insertImageAtContextMenu, insertShapeAtContextMenu, setCanvasContextMenu, pseudoPointerMode, pointerHintVisible, pseudoLeftClick, canvasPointToScreenPoint, pseudoPointerPos, cursorCoordinates, setPseudoLeftClick, onlyPanningMode, setColorPickerModal, activateStrokeMode, activatePanMode, activatePointerMode, activateEraserMode, confirmWipeCanvas, resetViewportToContent, smoothingEnabled, setSmoothingEnabled, shapeTool, activateShapeTool, activateLassoMode, activateRectangleSelectionMode, eraserModeType, setEraserModeType, eraserSize, setEraserSize, setStrokeWidth, setStrokeColor, clearCanvasDialogOpen, setClearCanvasDialogOpen, wipeCanvas, customSwatches, onColorSelect, showColorPickerModal };
+    return { cancelSelectionGesture, startMiddlePan, finishMiddlePan, selectedImageId, selectCanvasImage, updateCanvasImage, insertShapeAtCenter: (tool: Exclude<ShapeTool, "freehand">) => insertShapeAtCanvasPoint(insertionCenter(), tool), insertImageAtCenter: () => pickImageAtCanvasPoint(insertionCenter()), canvasBackgroundColor, buttonsContainerColor, curIdx, canvasItems, setCurIdx, windowHeight, canvasCursor, canvasRef, nativeTouchActiveRef, onTouchMoveSvg, onTouchStartSvg, onTouchEndSvg, cancelScribbleFreeze, nativeTwoFingerGestureActiveRef, prevFingersPos, prevTwoFingerDist, setShouldBlockDrawing, eraserMode, cancelEraserGesture, lassoMode, rectangleSelectionMode, finalizeLassoSelection, prepareForNextDrawing, isSelectionResizePointerEvent, selectedPathIndexes, clearSelection, startWebEraserPointer, handleConfiguredPointerStart, handlePointerMoveSvg, handleConfiguredPointerMove, finishWebEraserPointer, handleConfiguredPointerEnd, eraserPointerIdRef, getWebPointerPosition, queueEraserTrailPoint, webCanvasEventProps, onCanvasLayout, svgRef, x, y, scale, svgItems, pendingEraseItemIds, selectedBounds, lassoPath, eraserPreviewPath, eraserPreviewOpacity, strokeColorPreview, curPath, strokeWidth, imgItems, selectionScreenBounds, isSelectionDragging, isSelectionResizing, startSelectionDrag, moveSelectionDrag, endSelectionDrag, startSelectionResize, moveSelectionResize, endSelectionResize, duplicateSelectedPaths, deleteSelectedPaths, canvasContextMenu, pasteSelectionAtContextMenu, insertImageAtContextMenu, insertShapeAtContextMenu, setCanvasContextMenu, pseudoPointerMode, pointerHintVisible, pseudoLeftClick, canvasPointToScreenPoint, pseudoPointerPos, cursorCoordinates, setPseudoLeftClick, onlyPanningMode, setColorPickerModal, activateStrokeMode, activatePanMode, activatePointerMode, activateEraserMode, confirmWipeCanvas, resetViewportToContent, smoothingEnabled, setSmoothingEnabled, shapeTool, activateShapeTool, activateLassoMode, activateRectangleSelectionMode, eraserModeType, setEraserModeType, eraserSize, setEraserSize, setStrokeWidth, setStrokeColor, clearCanvasDialogOpen, setClearCanvasDialogOpen, wipeCanvas, customSwatches, onColorSelect, showColorPickerModal };
 }

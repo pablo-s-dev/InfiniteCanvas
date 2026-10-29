@@ -10,6 +10,7 @@ import { UnsavedDrawingDialog } from "../features/documents/components/UnsavedDr
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, BackHandler, Platform, Pressable, Text, View } from "react-native";
 import { NavigationBar } from "expo-navigation-bar";
+import * as TaskManager from "expo-task-manager";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 // Metro does not resolve nuqs package subpath exports reliably in Expo web.
 // The public export maps to this file in nuqs 2.x.
@@ -557,6 +558,15 @@ function InfiniteCanvasAppContent() {
     </>);
 }
 export default function InfiniteCanvasApp() {
+    useEffect(() => {
+        if (Platform.OS !== "web") {
+            void TaskManager.isTaskRegisteredAsync("infinite-canvas-cloud-sync-v1").then((registered) => {
+                if (registered) {
+                    return TaskManager.unregisterTaskAsync("infinite-canvas-cloud-sync-v1");
+                }
+            }).catch(() => undefined);
+        }
+    }, []);
     useEffect(() => {
         if (Platform.OS !== "web" || typeof document === "undefined")
             return;

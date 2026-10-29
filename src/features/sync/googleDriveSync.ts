@@ -2,6 +2,7 @@ import { withDeadline } from "./withDeadline";
 import * as SecureStore from "expo-secure-store";
 import type { SignInSuccessResponse } from "@react-native-google-signin/google-signin";
 import { NativeModules, Platform } from "react-native";
+import { jsonStorage } from "../../shared/storage/jsonStorage";
 import {
   CanvasDocument,
   isCanvasDocument,
@@ -72,6 +73,10 @@ type ServiceSession = {
   expiresAt: string;
   email: string;
   accountBinding: string;
+  entitlement?: {
+    active: boolean | null;
+    status: string;
+  };
 };
 
 type ApiErrorPayload = {
@@ -114,6 +119,7 @@ declare global {
 }
 
 const SESSION_STORAGE_KEY = "infinite_canvas_cloud_sync_session_v1";
+const ENTITLEMENT_CACHE_PREFIX = "infinite-canvas:entitlement:";
 const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const LEGACY_APP_DATA_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
 const GOOGLE_IDENTITY_SCOPE = "openid email profile";
@@ -257,9 +263,44 @@ export class GoogleDriveSync {
   }
 
   cancelPendingRequests(): void { this.sessionGeneration += 1; for (const controller of this.activeRequests) controller.abort(); }
+  async getCachedEntitlement(accountBinding: string): Promise<CloudSyncEntitlement | null> {
+    try {
+      return await jsonStorage.get<CloudSyncEntitlement>(`${ENTITLEMENT_CACHE_PREFIX}${accountBinding}`);
+    } catch {
+      return null;
+    }
+  }
+
+  async setCachedEntitlement(accountBinding: string, entitlement: CloudSyncEntitlement): Promise<void> {
+    try {
+      await jsonStorage.set(`${ENTITLEMENT_CACHE_PREFIX}${accountBinding}`, entitlement);
+    } catch {
+      // Ignore cache storage errors
+    }
+  }
+
   async restoreAccount(): Promise<CloudSyncAccount | null> {
     if (!await this.restoreSession()) return null;
-    return this.getAccount();
+    try {
+      return await this.getAccount();
+    } catch (error) {
+      if (this.session && !(error instanceof CloudSyncApiError && (error.code === "session_expired" || error.code === "session_required" || error.status === 401))) {
+        const cached = await this.getCachedEntitlement(this.session.accountBinding);
+        const active = cached?.active ?? this.session.entitlement?.active ?? null;
+        const status = cached?.status ?? this.session.entitlement?.status ?? "unknown";
+        return {
+          email: this.session.email,
+          accountBinding: this.session.accountBinding,
+          entitlement: {
+            active,
+            status,
+            accountBinding: this.session.accountBinding,
+          },
+          drive: this.verifiedDriveReady ? "ready" : "unavailable",
+        };
+      }
+      throw error;
+    }
   }
   getAccountBindingIfKnown(): string | undefined { return this.session?.accountBinding; }
   async getAccount(): Promise<CloudSyncAccount> {
@@ -267,11 +308,32 @@ export class GoogleDriveSync {
     if (!isRecord(result) || typeof result.email !== "string" || typeof result.accountBinding !== "string" ||
         !isRecord(result.entitlement) || (typeof result.entitlement.active !== "boolean" && result.entitlement.active !== null) || typeof result.entitlement.status !== "string" ||
         !["ready", "reauthorization-required", "unavailable"].includes(String(result.drive))) throw new Error("Invalid account response.");
-    this.session = {token: this.session?.token ?? "cookie", expiresAt: this.session?.expiresAt ?? new Date(Date.now() + 86400000).toISOString(), email: result.email, accountBinding: result.accountBinding};
+    const active = result.entitlement.active;
+    const status = result.entitlement.status;
+    const entitlement: CloudSyncEntitlement = {
+      active,
+      status,
+      accountBinding: result.accountBinding,
+    };
+    if (typeof active === "boolean") {
+      await this.setCachedEntitlement(result.accountBinding, entitlement);
+    }
+    this.session = {
+      token: this.session?.token ?? "cookie",
+      expiresAt: this.session?.expiresAt ?? new Date(Date.now() + 86400000).toISOString(),
+      email: result.email,
+      accountBinding: result.accountBinding,
+      entitlement: { active, status },
+    };
     this.verifiedDriveReady = result.drive === "ready";
     this.state = {status: "ready", email: result.email};
     await this.persistSession();
-    return {email: result.email, accountBinding: result.accountBinding, entitlement: {active: result.entitlement.active, status: result.entitlement.status, accountBinding: result.accountBinding}, drive: result.drive as CloudSyncAccount["drive"]};
+    return {
+      email: result.email,
+      accountBinding: result.accountBinding,
+      entitlement,
+      drive: result.drive as CloudSyncAccount["drive"],
+    };
   }
   async renewSession(): Promise<void> {
     const result = await this.requestJson("POST", "/v1/auth/session/renew", {});
@@ -290,15 +352,23 @@ export class GoogleDriveSync {
     ) {
       throw new Error("Cloud Sync returned an invalid entitlement response.");
     }
-    if (this.session) {
-      this.session = { ...this.session, accountBinding: result.accountBinding };
-      await this.persistSession();
-    }
-    return {
+    const entitlement: CloudSyncEntitlement = {
       active: result.active,
       status: result.status,
       accountBinding: result.accountBinding,
     };
+    if (typeof result.active === "boolean") {
+      await this.setCachedEntitlement(result.accountBinding, entitlement);
+    }
+    if (this.session) {
+      this.session = {
+        ...this.session,
+        accountBinding: result.accountBinding,
+        entitlement: { active: result.active, status: result.status },
+      };
+      await this.persistSession();
+    }
+    return entitlement;
   }
 
   async verifyPurchase(purchaseToken: string): Promise<CloudSyncEntitlement> {
@@ -313,15 +383,23 @@ export class GoogleDriveSync {
     ) {
       throw new Error("Cloud Sync returned an invalid purchase response.");
     }
-    if (this.session) {
-      this.session = { ...this.session, accountBinding: result.accountBinding };
-      await this.persistSession();
-    }
-    return {
+    const entitlement: CloudSyncEntitlement = {
       active: result.active,
       status: result.status,
       accountBinding: result.accountBinding,
     };
+    if (typeof result.active === "boolean") {
+      await this.setCachedEntitlement(result.accountBinding, entitlement);
+    }
+    if (this.session) {
+      this.session = {
+        ...this.session,
+        accountBinding: result.accountBinding,
+        entitlement: { active: result.active, status: result.status },
+      };
+      await this.persistSession();
+    }
+    return entitlement;
   }
 
   async getAccountBinding(): Promise<string> {
@@ -698,6 +776,12 @@ export class GoogleDriveSync {
         expiresAt: parsed.expiresAt,
         email: parsed.email,
         accountBinding: parsed.accountBinding,
+        entitlement: isRecord(parsed.entitlement) && typeof parsed.entitlement.status === "string"
+          ? {
+              active: typeof parsed.entitlement.active === "boolean" ? parsed.entitlement.active : null,
+              status: parsed.entitlement.status,
+            }
+          : undefined,
       };
       this.state = { status: "ready", email: parsed.email };
       return true;
